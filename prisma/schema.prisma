@@ -1,0 +1,251 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────────────────────
+// ENUMS
+// ──────────────────────────────────────────────────────────────
+
+enum ConsignorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StoreStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ConsignmentStatus {
+  PENDING        // Nháp, chưa gửi
+  SENT           // Đã gửi, chưa bán gì
+  PARTIAL_SOLD   // Đã bán/return/damage một phần, còn tồn
+  COMPLETED      // Tất cả items đã bán/return/damage hết
+  RETURNED       // Đã trả hàng về
+  SETTLED        // Đã thanh toán xong
+  CANCELLED      // Huỷ bỏ
+}
+
+enum ConsignmentItemStatus {
+  ACTIVE
+  RETURNED
+  DAMAGED
+  SOLD_OUT
+}
+
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
+}
+
+enum SettlementStatus {
+  PENDING     // Chờ duyệt / chờ thanh toán
+  CONFIRMED   // Đã duyệt
+  PAID        // Đã thanh toán
+}
+
+// ──────────────────────────────────────────────────────────────
+// MODELS
+// ──────────────────────────────────────────────────────────────
+
+model Consignor {
+  id              String           @id @default(cuid())
+  code            String           @unique
+  companyName     String
+  contactPerson   String?
+  phone           String?
+  email           String?
+  address         String?
+  note            String?
+  status          ConsignorStatus @default(ACTIVE)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  products        Product[]
+  consignments    Consignment[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Store {
+  id              String       @id @default(cuid())
+  code            String       @unique
+  name            String
+  address         String?
+  ward            String?
+  district        String?
+  city            String       @default("TP. Hồ Chí Minh")
+  contactPerson   String?
+  phone           String?
+  email           String?
+  note            String?
+  status          StoreStatus  @default(ACTIVE)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  consignments    Consignment[]
+  sales           Sale[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Product {
+  id              String         @id @default(cuid())
+  sku             String         @unique
+  name            String
+  category        String?
+  unit            String         @default("cái")
+  price           Decimal        @db.Decimal(15, 2)
+  commissionRate  Decimal        @db.Decimal(5, 4)
+  description     String?
+  imageUrl        String?
+  note            String?
+  status          ProductStatus  @default(ACTIVE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  consignorId     String
+  consignor       Consignor      @relation(fields: [consignorId], references: [id])
+
+  consignmentItems ConsignmentItem[]
+  sales            Sale[]
+
+  @@index([consignorId])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([category])
+}
+
+model Consignment {
+  id                  String             @id @default(cuid())
+  code                String             @unique
+  status              ConsignmentStatus @default(PENDING)
+  sentDate            DateTime
+  expectedReturnDate  DateTime?
+  actualReturnDate    DateTime?
+  note                String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  consignorId         String
+  consignor           Consignor          @relation(fields: [consignorId], references: [id])
+
+  storeId             String
+  store               Store              @relation(fields: [storeId], references: [id])
+
+  settlement          Settlement?
+  consignmentItems    ConsignmentItem[]
+  sales               Sale[]
+
+  @@index([consignorId])
+  @@index([storeId])
+  @@index([status])
+  @@index([sentDate])
+  @@index([expectedReturnDate])
+  @@index([deletedAt])
+}
+
+model ConsignmentItem {
+  id               String                  @id @default(cuid())
+  quantitySent     Int                     @default(0)
+  quantitySold     Int                     @default(0)
+  quantityReturned Int                     @default(0)
+  quantityDamaged  Int                     @default(0)
+  status           ConsignmentItemStatus   @default(ACTIVE)
+  note             String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  consignmentId    String
+  consignment      Consignment             @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
+
+  productId        String
+  product          Product                 @relation(fields: [productId], references: [id])
+
+  sales            Sale[]
+
+  // 1 product chỉ xuất hiện 1 lần trong 1 consignment
+  @@unique([consignmentId, productId])
+  @@index([consignmentId])
+  @@index([productId])
+}
+
+model Sale {
+  id            String      @id @default(cuid())
+  quantity      Int
+  soldPrice     Decimal     @db.Decimal(15, 2)
+  grossAmount   Decimal     @db.Decimal(18, 2)
+  soldAt        DateTime    @default(now())
+  status        SaleStatus  @default(COMPLETED)
+  note          String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  consignmentId String
+  consignment   Consignment @relation(fields: [consignmentId], references: [id])
+
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+
+  storeId       String
+  store         Store       @relation(fields: [storeId], references: [id])
+
+  @@index([consignmentId])
+  @@index([productId])
+  @@index([storeId])
+  @@index([soldAt])
+  @@index([status])
+}
+
+model Settlement {
+  id                      String            @id @default(cuid())
+  code                    String            @unique
+  status                  SettlementStatus  @default(PENDING)
+
+  totalSalesAmount        Decimal           @db.Decimal(18, 2)  @default(0)
+  totalCommissionAmount   Decimal           @db.Decimal(18, 2)  @default(0)
+  totalPayableAmount      Decimal           @db.Decimal(18, 2)  @default(0)
+
+  totalQuantitySold       Int               @default(0)
+  totalQuantityReturned    Int               @default(0)
+  totalQuantityDamaged     Int               @default(0)
+
+  adjustmentAmount        Decimal           @db.Decimal(18, 2) @default(0)
+  adjustmentReason        String?
+
+  settledAt               DateTime?
+  paidAt                  DateTime?
+  dueDate                 DateTime?
+
+  note                    String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  consignmentId           String            @unique
+  consignment              Consignment       @relation(fields: [consignmentId], references: [id])
+
+  @@index([consignmentId])
+  @@index([status])
+  @@index([settledAt])
+  @@index([paidAt])
+}
