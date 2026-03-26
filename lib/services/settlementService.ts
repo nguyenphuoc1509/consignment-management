@@ -1,8 +1,6 @@
 // lib/services/settlementService.ts
 import prisma from "@/lib/prisma";
 import { CommissionService } from "./commissionService";
-import { Decimal } from "@prisma/client/runtime/library";
-import { SettlementStatus } from "@prisma/client";
 
 function generateCode(prefix: string): string {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -12,16 +10,13 @@ function generateCode(prefix: string): string {
 
 export interface CreateSettlementInput {
   consignmentId: string;
-  adjustmentAmount?: Decimal | number;
-  adjustmentReason?: string;
   dueDate?: Date;
   note?: string;
 }
 
 export class SettlementService {
   static async createSettlement(input: CreateSettlementInput) {
-    const { consignmentId, adjustmentAmount, adjustmentReason, dueDate, note } =
-      input;
+    const { consignmentId, dueDate, note } = input;
 
     const existing = await prisma.settlement.findUnique({
       where: { consignmentId },
@@ -33,54 +28,39 @@ export class SettlementService {
       );
     }
 
-    const commissionResult =
-      await CommissionService.calculateConsignmentCommission(consignmentId);
-
-    const adjAmount = adjustmentAmount
-      ? new Decimal(adjustmentAmount)
-      : new Decimal(0);
+    const summary = await CommissionService.calculateConsignmentSettlement(consignmentId);
 
     const settlement = await prisma.settlement.create({
       data: {
         code: generateCode("ST"),
         consignmentId,
-        totalSalesAmount: commissionResult.totalSalesAmount,
-        totalCommissionAmount: commissionResult.totalCommissionAmount,
-        totalPayableAmount: commissionResult.totalPayableAmount.add(adjAmount),
-        totalQuantitySold: commissionResult.totalQuantitySold,
-        totalQuantityReturned: commissionResult.totalQuantityReturned,
-        totalQuantityDamaged: commissionResult.totalQuantityDamaged,
-        adjustmentAmount: adjAmount,
-        adjustmentReason,
+        totalSoldQuantity: summary.totalSoldQuantity,
+        totalReturnedQuantity: summary.totalReturnedQuantity,
+        totalDamagedQuantity: summary.totalDamagedQuantity,
         dueDate,
         note,
         settledAt: new Date(),
       },
     });
 
-    return { settlement, commissionResult };
+    return { settlement, summary };
   }
 
-  static async updateAdjustment(
-    settlementId: string,
-    adjustmentAmount: Decimal | number,
-    adjustmentReason: string
-  ) {
+  static async approve(settlementId: string, approvedBy: number) {
     const settlement = await prisma.settlement.findUniqueOrThrow({
       where: { id: settlementId },
     });
 
-    if (settlement.status === "PAID") {
-      throw new Error("Không thể điều chỉnh settlement đã thanh toán");
+    if (settlement.status !== "PENDING") {
+      throw new Error(`Chỉ settlement ở trạng thái PENDING mới có thể duyệt (hiện tại: ${settlement.status})`);
     }
-
-    const adjAmount = new Decimal(adjustmentAmount);
 
     return prisma.settlement.update({
       where: { id: settlementId },
       data: {
-        adjustmentAmount: adjAmount,
-        adjustmentReason,
+        status: "CONFIRMED",
+        approvedBy,
+        approvedAt: new Date(),
       },
     });
   }
@@ -91,28 +71,26 @@ export class SettlementService {
         where: { id: settlementId },
       });
 
-      if (settlement.status === "PAID") {
-        throw new Error("Settlement này đã được thanh toán");
-      }
-
       if (settlement.status === "CANCELLED") {
         throw new Error("Không thể thanh toán settlement đã huỷ");
+      }
+
+      if (settlement.status === "PENDING") {
+        throw new Error("Settlement cần được duyệt (CONFIRMED) trước khi thanh toán");
+      }
+
+      if (settlement.status === "PAID") {
+        throw new Error("Settlement này đã được thanh toán");
       }
 
       const [updatedSettlement, updatedConsignment] = await Promise.all([
         tx.settlement.update({
           where: { id: settlementId },
-          data: {
-            status: SettlementStatus.PAID,
-            paidAt: new Date(),
-          },
+          data: { status: "PAID", paidAt: new Date() },
         }),
         tx.consignment.update({
           where: { id: settlement.consignmentId },
-          data: {
-            status: "SETTLED",
-            actualReturnDate: new Date(),
-          },
+          data: { status: "SETTLED", actualReturnDate: new Date() },
         }),
       ]);
 
@@ -127,22 +105,21 @@ export class SettlementService {
       });
 
       if (settlement.status === "PAID") {
-        throw new Error(
-          "Không thể huỷ settlement đã thanh toán. Cần tạo settlement mới."
-        );
+        throw new Error("Không thể huỷ settlement đã thanh toán");
       }
 
-      const consignment = await tx.consignment.update({
-        where: { id: settlement.consignmentId },
-        data: { status: "COMPLETED" },
-      });
+      const [cancelledSettlement, updatedConsignment] = await Promise.all([
+        tx.settlement.update({
+          where: { id: settlementId },
+          data: { status: "CANCELLED" },
+        }),
+        tx.consignment.update({
+          where: { id: settlement.consignmentId },
+          data: { status: "COMPLETED" },
+        }),
+      ]);
 
-      const cancelledSettlement = await tx.settlement.update({
-        where: { id: settlementId },
-        data: { status: "CANCELLED" },
-      });
-
-      return { settlement: cancelledSettlement, consignment };
+      return { settlement: cancelledSettlement, consignment: updatedConsignment };
     });
   }
 
@@ -156,11 +133,10 @@ export class SettlementService {
       include: { consignment: true },
     });
 
-    const commissionResult =
-      await CommissionService.calculateConsignmentCommission(
-        settlement.consignmentId
-      );
+    const summary = await CommissionService.calculateConsignmentSettlement(
+      settlement.consignmentId
+    );
 
-    return { settlement, breakdown: commissionResult.breakdown };
+    return { settlement, breakdown: summary };
   }
 }

@@ -1,16 +1,34 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { MOCK_STORES } from "@/lib/mock-data";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { api } from "@/lib/api/client";
 import { Store } from "@/types/store";
 import { useDebounce } from "./useDebounce";
 
 export function useStores() {
-  const [stores, setStores] = useState<Store[]>(MOCK_STORES);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const debouncedSearch = useDebounce(search);
+
+  useEffect(() => {
+    async function fetchStores() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await api.get<Store[]>("/api/stores");
+        setStores(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch stores");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStores();
+  }, []);
 
   const filtered = useMemo(() => {
     return stores.filter((s) => {
@@ -19,9 +37,9 @@ export function useStores() {
         !q ||
         s.name.toLowerCase().includes(q) ||
         s.code.toLowerCase().includes(q) ||
-        s.contactPerson.toLowerCase().includes(q) ||
-        s.phone.includes(q) ||
-        s.address.toLowerCase().includes(q) ||
+        s.contactPerson?.toLowerCase().includes(q) ||
+        s.phone?.includes(q) ||
+        s.address?.toLowerCase().includes(q) ||
         s.city.toLowerCase().includes(q) ||
         (s.email && s.email.toLowerCase().includes(q));
       const matchStatus =
@@ -34,32 +52,40 @@ export function useStores() {
   const active = stores.filter((s) => s.status === "ACTIVE").length;
   const inactive = stores.filter((s) => s.status === "INACTIVE").length;
 
-  function deleteStore(storeOrId: Store | string) {
+  const deleteStore = useCallback(async (storeOrId: Store | string) => {
     const id = typeof storeOrId === "string" ? storeOrId : storeOrId.id;
-    setStores((prev) => prev.filter((s) => s.id !== id));
-  }
+    try {
+      await api.delete(`/api/stores/${id}`);
+      setStores((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      throw err;
+    }
+  }, []);
 
-  function updateStore(id: string, data: Partial<Store>) {
-    setStores((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? { ...s, ...data, updatedAt: new Date().toISOString() }
-          : s
-      )
-    );
-  }
+  const updateStore = useCallback(async (id: string, data: Partial<Store>) => {
+    try {
+      const updated = await api.put<Store>(`/api/stores/${id}`, data);
+      setStores((prev) =>
+        prev.map((s) => (s.id === id ? updated : s))
+      );
+      return updated;
+    } catch (err) {
+      throw err;
+    }
+  }, []);
 
-  function addStore(data: Omit<Store, "id" | "createdAt" | "updatedAt">) {
-    const now = new Date().toISOString();
-    const newStore: Store = {
-      ...data,
-      id: `ST-${String(Date.now()).slice(-6)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setStores((prev) => [newStore, ...prev]);
-    return newStore;
-  }
+  const addStore = useCallback(
+    async (data: Omit<Store, "id" | "createdAt" | "updatedAt">) => {
+      try {
+        const newStore = await api.post<Store>("/api/stores", data);
+        setStores((prev) => [newStore, ...prev]);
+        return newStore;
+      } catch (err) {
+        throw err;
+      }
+    },
+    []
+  );
 
   function getStore(id: string) {
     return stores.find((s) => s.id === id) ?? null;
@@ -68,6 +94,8 @@ export function useStores() {
   return {
     stores,
     filtered,
+    loading,
+    error,
     filters: {
       search,
       statusFilter,

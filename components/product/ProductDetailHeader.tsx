@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowLeft, Edit2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Product } from "@/types/product";
 
 interface ProductDetailHeaderProps {
@@ -23,23 +22,16 @@ export function ProductDetailHeader({
 }: ProductDetailHeaderProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3 w-full">
+      <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon-sm" asChild>
           <Link href="/dashboard/products">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
         <div className="flex flex-col gap-0.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-bold text-foreground sm:text-xl truncate max-w-[280px] sm:max-w-none">
-              {product.name}
-            </h2>
-            <Badge
-              variant={product.status === "ACTIVE" ? "default" : "secondary"}
-            >
-              {product.status === "ACTIVE" ? "Hoạt động" : "Tạm ngưng"}
-            </Badge>
-          </div>
+          <h2 className="text-lg font-bold text-foreground sm:text-xl truncate max-w-[280px] sm:max-w-none">
+            {product.name}
+          </h2>
           <p className="text-xs text-muted-foreground sm:text-sm">
             Mã: {product.sku}
           </p>

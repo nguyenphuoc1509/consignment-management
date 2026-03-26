@@ -1,58 +1,28 @@
 // lib/services/commissionService.ts
 import prisma from "@/lib/prisma";
-import { Decimal } from "@prisma/client/runtime/library";
 
-export interface SaleCommissionResult {
-  saleId: string;
-  productId: string;
-  productName: string;
-  quantity: number;
-  soldPrice: Decimal;
-  grossAmount: Decimal;
-  commissionRate: Decimal;
-  commissionAmount: Decimal;
-  payableAmount: Decimal;
-}
-
-export interface SettlementCommissionResult {
-  totalSalesAmount: Decimal;
-  totalCommissionAmount: Decimal;
-  totalPayableAmount: Decimal;
-  totalQuantitySold: number;
-  totalQuantityReturned: number;
-  totalQuantityDamaged: number;
-  breakdown: SaleCommissionResult[];
+export interface SettlementSummary {
+  totalSoldQuantity: number;
+  totalReturnedQuantity: number;
+  totalDamagedQuantity: number;
+  totalSoldAmount: number; // tổng doanh số = sum(quantity * soldPrice)
+  breakdown: {
+    saleId: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    soldPrice: number;
+    soldAmount: number;
+  }[];
 }
 
 export class CommissionService {
-  static calculateSaleCommission(
-    quantity: number,
-    soldPrice: Decimal | number,
-    commissionRate: Decimal | number
-  ): { grossAmount: Decimal; commissionAmount: Decimal; payableAmount: Decimal } {
-    const soldPriceNum =
-      typeof soldPrice === "number" ? soldPrice : Number(soldPrice);
-    const rateNum =
-      typeof commissionRate === "number" ? commissionRate : Number(commissionRate);
-
-    const grossAmount = new Decimal(soldPriceNum * quantity);
-    const commissionAmount = grossAmount.mul(rateNum).round(2);
-    const payableAmount = grossAmount.sub(commissionAmount);
-
-    return { grossAmount, commissionAmount, payableAmount };
-  }
-
-  static async calculateConsignmentCommission(
+  static async calculateConsignmentSettlement(
     consignmentId: string
-  ): Promise<SettlementCommissionResult> {
+  ): Promise<SettlementSummary> {
     const sales = await prisma.sale.findMany({
-      where: {
-        consignmentId,
-        status: "COMPLETED",
-      },
-      include: {
-        product: { select: { commissionRate: true, name: true } },
-      },
+      where: { consignmentId, status: "CONFIRMED" },
+      include: { product: { select: { name: true } } },
     });
 
     const itemSummaries = await prisma.consignmentItem.findMany({
@@ -60,60 +30,44 @@ export class CommissionService {
       select: { quantityReturned: true, quantityDamaged: true },
     });
 
-    let totalSalesAmount = new Decimal(0);
-    let totalCommissionAmount = new Decimal(0);
-    let totalPayableAmount = new Decimal(0);
-    let totalQuantitySold = 0;
+    let totalSoldQuantity = 0;
+    let totalSoldAmount = 0;
+    const breakdown: SettlementSummary["breakdown"] = [];
 
-    const breakdown: SaleCommissionResult[] = sales.map((sale) => {
-      const { grossAmount, commissionAmount, payableAmount } =
-        this.calculateSaleCommission(
-          sale.quantity,
-          sale.soldPrice,
-          sale.product.commissionRate
-        );
+    for (const sale of sales) {
+      const soldPriceNum = Number(sale.soldPrice);
+      totalSoldQuantity += sale.quantity;
+      totalSoldAmount += soldPriceNum * sale.quantity;
 
-      totalSalesAmount = totalSalesAmount.add(grossAmount);
-      totalCommissionAmount = totalCommissionAmount.add(commissionAmount);
-      totalPayableAmount = totalPayableAmount.add(payableAmount);
-      totalQuantitySold += sale.quantity;
-
-      return {
+      breakdown.push({
         saleId: sale.id,
         productId: sale.productId,
         productName: sale.product.name,
         quantity: sale.quantity,
-        soldPrice: sale.soldPrice,
-        grossAmount,
-        commissionRate: sale.product.commissionRate,
-        commissionAmount,
-        payableAmount,
-      };
-    });
+        soldPrice: soldPriceNum,
+        soldAmount: soldPriceNum * sale.quantity,
+      });
+    }
 
-    const totalQuantityReturned = itemSummaries.reduce(
+    const totalReturnedQuantity = itemSummaries.reduce(
       (sum, item) => sum + item.quantityReturned,
       0
     );
-    const totalQuantityDamaged = itemSummaries.reduce(
+    const totalDamagedQuantity = itemSummaries.reduce(
       (sum, item) => sum + item.quantityDamaged,
       0
     );
 
     return {
-      totalSalesAmount,
-      totalCommissionAmount,
-      totalPayableAmount,
-      totalQuantitySold,
-      totalQuantityReturned,
-      totalQuantityDamaged,
+      totalSoldQuantity,
+      totalReturnedQuantity,
+      totalDamagedQuantity,
+      totalSoldAmount,
       breakdown,
     };
   }
 
-  static async previewSettlement(
-    consignmentId: string
-  ): Promise<SettlementCommissionResult> {
-    return this.calculateConsignmentCommission(consignmentId);
+  static async previewSettlement(consignmentId: string): Promise<SettlementSummary> {
+    return this.calculateConsignmentSettlement(consignmentId);
   }
 }

@@ -31,7 +31,7 @@ function ConsignorCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm text-foreground truncate">
-            {consignor.companyName}
+            {consignor.companyName ?? consignor.name}
           </p>
           <p className="font-mono text-xs text-muted-foreground mt-0.5">
             {consignor.code}
@@ -132,7 +132,7 @@ export function ConsignorTable({
                   <TableCell>
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium text-sm text-foreground">
-                        {consignor.companyName}
+                        {consignor.companyName ?? consignor.name}
                       </span>
                       {consignor.email && (
                         <span className="text-xs text-muted-foreground truncate max-w-[180px] block">

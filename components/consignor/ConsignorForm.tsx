@@ -24,7 +24,7 @@ export function ConsignorForm({
   const isEditing = !!consignor;
 
   const [form, setForm] = useState({
-    companyName: consignor?.companyName ?? "",
+    companyName: consignor?.name ?? "",
     code: consignor?.code ?? "",
     contactPerson: consignor?.contactPerson ?? "",
     phone: consignor?.phone ?? "",

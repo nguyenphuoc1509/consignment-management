@@ -25,7 +25,7 @@ export function determineConsignmentStatus(
     return ConsignmentStatus.PARTIAL_SOLD;
   }
 
-  return ConsignmentStatus.SENT;
+  return ConsignmentStatus.SHIPPED;
 }
 
 export class ConsignmentService {
@@ -56,27 +56,6 @@ export class ConsignmentService {
     return newStatus;
   }
 
-  static async validateProductBelongsToConsignor(
-    consignmentId: string,
-    productId: string
-  ): Promise<boolean> {
-    const item = await prisma.consignmentItem.findUnique({
-      where: {
-        consignmentId_productId: { consignmentId, productId },
-      },
-      select: { product: { select: { consignorId: true } } },
-    });
-
-    if (!item) return false;
-
-    const consignment = await prisma.consignment.findUnique({
-      where: { id: consignmentId },
-      select: { consignorId: true },
-    });
-
-    return item.product.consignorId === consignment?.consignorId;
-  }
-
   static async getConsignmentWithItems(consignmentId: string) {
     return prisma.consignment.findUnique({
       where: { id: consignmentId },
@@ -89,7 +68,6 @@ export class ConsignmentService {
               select: {
                 name: true,
                 sku: true,
-                commissionRate: true,
                 price: true,
                 category: true,
               },

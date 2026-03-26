@@ -10,6 +10,7 @@ import {
   ProductTable,
 } from "@/components/product";
 import { DeleteDialog } from "@/components/deleteDialog/DeleteDialog";
+import { SuccessDialog, FailDialog } from "@/components/dialog";
 import { Product } from "@/types/product";
 import { useProducts } from "@/hooks/useProducts";
 
@@ -22,6 +23,19 @@ export default function ProductsPage() {
   } = useProducts();
 
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [failOpen, setFailOpen] = useState(false);
+  const [failMessage, setFailMessage] = useState("");
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteProduct(deleteTarget);
+      setDeleteTarget(null);
+    } catch (err) {
+      setFailMessage(err instanceof Error ? err.message : "Xóa sản phẩm thất bại.");
+      setFailOpen(true);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -42,20 +56,14 @@ export default function ProductsPage() {
       </div>
 
       {/* Summary cards */}
-      <ProductSummaryCards
-        total={counts.total}
-        active={counts.active}
-        inactive={counts.inactive}
-      />
+      <ProductSummaryCards total={counts.total} />
 
       {/* Filters */}
       <ProductFilters
         search={filters.search}
         categoryFilter={filters.categoryFilter}
-        statusFilter={filters.statusFilter}
         onSearchChange={filters.setSearch}
         onCategoryChange={filters.setCategoryFilter}
-        onStatusChange={filters.setStatusFilter}
       />
 
       {/* Table / Card list */}
@@ -69,10 +77,14 @@ export default function ProductsPage() {
         target={deleteTarget}
         itemLabel="sản phẩm"
         onClose={() => setDeleteTarget(null)}
-        onConfirm={() => {
-          if (deleteTarget) deleteProduct(deleteTarget);
-          setDeleteTarget(null);
-        }}
+        onConfirm={handleDelete}
+      />
+
+      <FailDialog
+        open={failOpen}
+        title="Xóa thất bại"
+        message={failMessage}
+        onClose={() => setFailOpen(false)}
       />
 
       {/* Results summary */}

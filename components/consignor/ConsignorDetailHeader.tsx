@@ -32,7 +32,7 @@ export function ConsignorDetailHeader({
         <div className="flex flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-bold text-foreground sm:text-xl truncate max-w-[280px] sm:max-w-none">
-              {consignor.companyName}
+              {consignor.companyName ?? consignor.name}
             </h2>
             <Badge
               variant={consignor.status === "ACTIVE" ? "default" : "secondary"}

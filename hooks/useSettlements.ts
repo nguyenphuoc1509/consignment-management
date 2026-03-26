@@ -1,19 +1,50 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import {
-  MOCK_SETTLEMENTS,
-  MOCK_CONSIGNMENTS,
-  MOCK_CONSIGNORS,
-  MOCK_STORES,
-  MOCK_SALES,
-  MOCK_PRODUCTS,
-} from "@/lib/mock-data";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { api } from "@/lib/api/client";
 import { Settlement, SettlementStatus, SettlementWithDetails } from "@/types/settlement";
+import { Consignment } from "@/types/consignment";
+import { Consignor } from "@/types/consignor";
+import { Store } from "@/types/store";
+import { Product } from "@/types/product";
+import { Sale } from "@/types/sale";
 import { useDebounce } from "./useDebounce";
 
+type SettlementApiResponse = Settlement & {
+  consignmentCode: string;
+  consignorName: string;
+  storeName: string;
+  saleCount: number;
+  consignmentId: string;
+};
+
+type SalesPreviewItem = {
+  saleId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  soldPrice: number;
+  soldAmount: number;
+};
+
+type SalesPreview = {
+  totalSoldQuantity: number;
+  totalReturnedQuantity: number;
+  totalDamagedQuantity: number;
+  totalSoldAmount: number;
+  breakdown: SalesPreviewItem[];
+};
+
 export function useSettlements() {
-  const [settlements, setSettlements] = useState<Settlement[]>(MOCK_SETTLEMENTS);
+  const [settlements, setSettlements] = useState<SettlementApiResponse[]>([]);
+  const [consignments, setConsignments] = useState<Consignment[]>([]);
+  const [consignors, setConsignors] = useState<Consignor[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [storeFilter, setStoreFilter] = useState("all");
@@ -22,25 +53,67 @@ export function useSettlements() {
 
   const debouncedSearch = useDebounce(search);
 
+  const fetchSettlements = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (statusFilter !== "all") params.set("statusFilter", statusFilter);
+      if (storeFilter !== "all") params.set("storeFilter", storeFilter);
+      if (consignorFilter !== "all") params.set("consignorFilter", consignorFilter);
+      if (consignmentFilter !== "all") params.set("consignmentFilter", consignmentFilter);
+
+      const queryString = params.toString();
+      const url = queryString ? `/api/settlements?${queryString}` : "/api/settlements";
+
+      const [settlementsRes, consignmentsRes, consignorsRes, storesRes, productsRes, salesRes] =
+        await Promise.all([
+          api.get<SettlementApiResponse[]>(url),
+          api.get<Consignment[]>("/api/consignments"),
+          api.get<Consignor[]>("/api/consignors"),
+          api.get<Store[]>("/api/stores"),
+          api.get<Product[]>("/api/products"),
+          api.get<Sale[]>("/api/sales"),
+        ]);
+
+      setSettlements(settlementsRes);
+      setConsignments(consignmentsRes);
+      setConsignors(consignorsRes);
+      setStores(storesRes);
+      setProducts(productsRes);
+      setSales(salesRes);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch settlements");
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, statusFilter, storeFilter, consignorFilter, consignmentFilter]);
+
+  useEffect(() => {
+    fetchSettlements();
+  }, [fetchSettlements]);
+
   const enriched = useMemo((): SettlementWithDetails[] => {
     return settlements.map((s) => {
-      const consignment = MOCK_CONSIGNMENTS.find((c) => c.id === s.consignmentId);
-      const consignor = consignment
-        ? MOCK_CONSIGNORS.find((cg) => cg.id === consignment.consignorId)
-        : undefined;
-      const store = MOCK_STORES.find((st) => st.id === s.storeId);
-      const consignmentSales = MOCK_SALES.filter(
+      const consignment = consignments.find((c) => c.id === s.consignmentId);
+      const consignmentSales = sales.filter(
         (sl) => sl.consignmentId === s.consignmentId && sl.status === "COMPLETED"
+      );
+      const completedSalesAmount = consignmentSales.reduce(
+        (sum, sl) => sum + sl.quantity * Number(sl.soldPrice),
+        0
       );
       return {
         ...s,
-        consignmentCode: consignment?.code ?? s.consignmentId,
-        consignorName: consignor?.companyName ?? consignor?.id ?? s.consignmentId,
-        storeName: store?.name ?? s.storeId,
-        saleCount: consignmentSales.length,
+        consignmentCode: s.consignmentCode,
+        consignorName: s.consignorName,
+        storeName: s.storeName,
+        saleCount: s.saleCount,
+        totalSoldAmount: completedSalesAmount,
       };
     });
-  }, [settlements]);
+  }, [settlements, consignments, sales]);
 
   const filtered = useMemo(() => {
     return enriched.filter((s) => {
@@ -51,126 +124,204 @@ export function useSettlements() {
         s.consignmentCode.toLowerCase().includes(q) ||
         s.consignorName.toLowerCase().includes(q) ||
         s.storeName.toLowerCase().includes(q);
-      const matchStatus =
-        statusFilter === "all" || s.status === statusFilter;
+      const matchStatus = statusFilter === "all" || s.status === statusFilter;
+      const settlementConsignment = consignments.find((c) => c.id === s.consignmentId);
       const matchStore =
-        storeFilter === "all" || s.storeId === storeFilter;
+        storeFilter === "all" ||
+        settlementConsignment?.storeId === storeFilter;
       const matchConsignor =
-        consignorFilter === "all" || s.consignorId === consignorFilter;
-      const matchConsignment =
-        consignmentFilter === "all" || s.consignmentId === consignmentFilter;
+        consignorFilter === "all" ||
+        settlementConsignment?.consignorId === consignorFilter;
+      const matchConsignment = consignmentFilter === "all" || s.consignmentId === consignmentFilter;
       return matchSearch && matchStatus && matchStore && matchConsignor && matchConsignment;
     });
-  }, [enriched, debouncedSearch, statusFilter, storeFilter, consignorFilter, consignmentFilter]);
+  }, [
+    enriched,
+    debouncedSearch,
+    statusFilter,
+    storeFilter,
+    consignorFilter,
+    consignmentFilter,
+    consignments,
+  ]);
 
   const total = settlements.length;
-  const totalPayable = useMemo(
-    () =>
-      settlements
-        .filter((s) => s.status !== "PAID")
-        .reduce((sum, s) => sum + s.totalPayableAmount, 0),
-    [settlements]
-  );
+  const totalPayable = useMemo(() => {
+    return settlements
+      .filter((s) => s.status !== "PAID")
+      .reduce((sum, s) => {
+        const consignmentSales = sales.filter(
+          (sl) => sl.consignmentId === s.consignmentId && sl.status === "COMPLETED"
+        );
+        return sum + consignmentSales.reduce((saleSum, sl) => saleSum + sl.quantity * Number(sl.soldPrice), 0);
+      }, 0);
+  }, [settlements, sales]);
   const byStatus = useMemo(() => {
     const counts: Record<SettlementStatus, number> = {
       PENDING: 0,
       CONFIRMED: 0,
       PAID: 0,
+      CANCELLED: 0,
     };
     for (const s of settlements) {
-      counts[s.status]++;
+      if (s.status in counts) {
+        counts[s.status]++;
+      }
     }
     return counts;
   }, [settlements]);
 
-  // Computed financial data per consignment from actual sales
   const salesByConsignment = useMemo(() => {
-    const result: Record<string, { count: number; totalAmount: number; commissionAmount: number; payableAmount: number }> = {};
-    for (const sale of MOCK_SALES) {
+    const result: Record<
+      string,
+      { count: number; totalAmount: number; commissionAmount: number; payableAmount: number }
+    > = {};
+    for (const sale of sales) {
       if (sale.status !== "COMPLETED") continue;
       if (!result[sale.consignmentId]) {
-        result[sale.consignmentId] = { count: 0, totalAmount: 0, commissionAmount: 0, payableAmount: 0 };
+        result[sale.consignmentId] = {
+          count: 0,
+          totalAmount: 0,
+          commissionAmount: 0,
+          payableAmount: 0,
+        };
       }
-      const product = MOCK_PRODUCTS.find((p) => p.id === sale.productId);
-      const commissionRate = (product?.commissionRate ?? 0) / 100;
-      const grossAmount = sale.quantity * sale.soldPrice;
-      const commission = Math.round(grossAmount * commissionRate);
+      const product = products.find((p) => p.id === sale.productId);
+      const soldAmount = sale.quantity * Number(sale.soldPrice);
       result[sale.consignmentId].count += 1;
-      result[sale.consignmentId].totalAmount += grossAmount;
-      result[sale.consignmentId].commissionAmount += commission;
-      result[sale.consignmentId].payableAmount += grossAmount - commission;
+      result[sale.consignmentId].totalAmount += soldAmount;
+      result[sale.consignmentId].commissionAmount += 0;
+      result[sale.consignmentId].payableAmount += soldAmount;
     }
     return result;
+  }, [sales, products]);
+
+  const fetchSalesPreview = useCallback(async (consignmentId: string): Promise<SalesPreview | null> => {
+    try {
+      const preview = await api.get<SalesPreview>(
+        `/api/settlements/preview?consignmentId=${consignmentId}`
+      );
+      return preview;
+    } catch {
+      return null;
+    }
   }, []);
 
-  function deleteSettlement(settlementOrId: SettlementWithDetails | string) {
-    const id = typeof settlementOrId === "string" ? settlementOrId : settlementOrId.id;
-    setSettlements((prev) => prev.filter((s) => s.id !== id));
-  }
+  const deleteSettlement = useCallback(
+    async (settlementOrId: SettlementWithDetails | string) => {
+      const id = typeof settlementOrId === "string" ? settlementOrId : settlementOrId.id;
+      try {
+        await api.delete(`/api/settlements/${id}`);
+        setSettlements((prev) => prev.filter((s) => s.id !== id));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete settlement");
+        throw err;
+      }
+    },
+    []
+  );
 
-  function markPaid(id: string) {
-    setSettlements((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? { ...s, status: "PAID" as SettlementStatus, updatedAt: new Date().toISOString() }
-          : s
-      )
-    );
-  }
+  const markPaid = useCallback(
+    async (id: string) => {
+      try {
+        const result = await api.put<{ settlement: Settlement }>(`/api/settlements/${id}`, {
+          action: "markPaid",
+        });
+        setSettlements((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  status: result.settlement.status as SettlementStatus,
+                  paidAt: result.settlement.paidAt as string,
+                  updatedAt: new Date().toISOString(),
+                }
+              : s
+          )
+        );
+        return result.settlement;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to mark settlement as paid");
+        throw err;
+      }
+    },
+    []
+  );
 
-  function addSettlement(
-    data: Omit<Settlement, "id" | "createdAt" | "updatedAt">
-  ): Settlement | null {
-    const now = new Date().toISOString();
-    const newSettlement: Settlement = {
-      ...data,
-      id: `ST-${String(Date.now()).slice(-6)}`,
-      code: `DS-${new Date().getFullYear()}-${String(
-        settlements.length + 1
-      ).padStart(3, "0")}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setSettlements((prev) => [newSettlement, ...prev]);
-    return newSettlement;
-  }
+  const addSettlement = useCallback(
+    async (data: { consignmentId: string; dueDate?: string; note?: string }) => {
+      try {
+        const result = await api.post<{ settlement: Settlement; summary: unknown }>(
+          "/api/settlements",
+          data
+        );
 
-  function getSettlement(id: string): SettlementWithDetails | null {
-    const s = settlements.find((s) => s.id === id);
-    if (!s) return null;
-    const consignment = MOCK_CONSIGNMENTS.find((c) => c.id === s.consignmentId);
-    const consignor = consignment
-      ? MOCK_CONSIGNORS.find((cg) => cg.id === consignment.consignorId)
-      : undefined;
-    const store = MOCK_STORES.find((st) => st.id === s.storeId);
-    const consignmentSales = MOCK_SALES.filter(
-      (sl) => sl.consignmentId === s.consignmentId && sl.status === "COMPLETED"
-    );
-    return {
-      ...s,
-      consignmentCode: consignment?.code ?? s.consignmentId,
-      consignorName: consignor?.companyName ?? consignor?.id ?? s.consignmentId,
-      storeName: store?.name ?? s.storeId,
-      saleCount: consignmentSales.length,
-    };
-  }
+        const settlementId = result.settlement.id;
+        const [settlementDetails] = await Promise.all([
+          api.get<SettlementApiResponse>(`/api/settlements/${settlementId}`),
+          fetchSettlements(),
+        ]);
 
-  function updateSettlement(
-    id: string,
-    data: Partial<Omit<Settlement, "id" | "createdAt" | "updatedAt">>
-  ) {
-    setSettlements((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? { ...s, ...data, updatedAt: new Date().toISOString() }
-          : s
-      )
-    );
-  }
+        setSettlements((prev) => [settlementDetails, ...prev]);
+        return result.settlement;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to add settlement");
+        throw err;
+      }
+    },
+    [fetchSettlements]
+  );
+
+  const getSettlement = useCallback(
+    (id: string): SettlementWithDetails | null => {
+      const s = settlements.find((s) => s.id === id);
+      if (!s) return null;
+      const consignment = consignments.find((c) => c.id === s.consignmentId);
+      const consignmentSales = sales.filter(
+        (sl) => sl.consignmentId === s.consignmentId && sl.status === "COMPLETED"
+      );
+      const completedSalesAmount = consignmentSales.reduce(
+        (sum, sl) => sum + sl.quantity * Number(sl.soldPrice),
+        0
+      );
+      return {
+        ...s,
+        consignmentCode: s.consignmentCode,
+        consignorName: s.consignorName,
+        storeName: s.storeName,
+        saleCount: s.saleCount,
+        totalSoldAmount: completedSalesAmount,
+      };
+    },
+    [settlements, consignments, sales]
+  );
+
+  const updateSettlement = useCallback(
+    async (
+      id: string,
+      data: Partial<Omit<Settlement, "id" | "createdAt" | "updatedAt">>
+    ) => {
+      try {
+        const updated = await api.put<Settlement>(`/api/settlements/${id}`, data);
+        setSettlements((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, ...updated, updatedAt: new Date().toISOString() } : s
+          )
+        );
+        return updated;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update settlement");
+        throw err;
+      }
+    },
+    []
+  );
 
   return {
     settlements: enriched,
     filtered,
+    loading,
+    error,
     filters: {
       search,
       statusFilter,
@@ -190,9 +341,11 @@ export function useSettlements() {
     getSettlement,
     updateSettlement,
     salesByConsignment,
-    stores: MOCK_STORES,
-    consignments: MOCK_CONSIGNMENTS,
-    consignors: MOCK_CONSIGNORS,
-    products: MOCK_PRODUCTS,
+    stores,
+    consignments,
+    consignors,
+    products,
+    fetchSalesPreview,
+    refetch: fetchSettlements,
   };
 }

@@ -174,9 +174,7 @@ export function ConsignmentForm({
     return products.find((p) => p.id === id)?.price ?? 0;
   }
 
-  const activeProducts = products.filter(
-    (p) => p.status === "ACTIVE" && p.consignorId === form.consignorId
-  );
+  const activeProducts = products;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -358,10 +356,10 @@ export function ConsignmentForm({
                 <SelectValue placeholder="Chọn sản phẩm..." />
               </SelectTrigger>
               <SelectContent>
-                {activeProducts.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    Không có sản phẩm nào cho bên giao hàng này.
-                  </div>
+                  {activeProducts.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      Chưa có sản phẩm nào.
+                    </div>
                 ) : (
                   activeProducts.map((p) => (
                     <SelectItem key={p.id} value={p.id}>

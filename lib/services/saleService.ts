@@ -1,8 +1,6 @@
 // lib/services/saleService.ts
 import prisma from "@/lib/prisma";
-import { Decimal } from "@prisma/client/runtime/library";
 import { InventoryService } from "./inventoryService";
-import { CommissionService } from "./commissionService";
 import { ConsignmentService } from "./consignmentService";
 
 function generateSaleCode(): string {
@@ -16,60 +14,69 @@ export interface CreateSaleInput {
   productId: string;
   storeId: string;
   quantity: number;
-  soldPrice: Decimal | number;
+  soldPrice: number;
   soldAt?: Date;
   note?: string;
+  salesReportDate?: Date;
+  salesReportRef?: string;
+  reportedBy?: string;
+}
+
+export interface CreateSaleResult {
+  sale: Awaited<ReturnType<typeof prisma.sale.create>>;
+  consignmentStatus: string;
+  warnings: string[];
 }
 
 export class SaleService {
   static async createSale(input: CreateSaleInput) {
-    const { consignmentId, productId, storeId, quantity, soldPrice, soldAt, note } =
-      input;
+    const {
+      consignmentId, productId, storeId, quantity, soldPrice,
+      soldAt, note, salesReportDate, salesReportRef, reportedBy,
+    } = input;
 
     return prisma.$transaction(async (tx) => {
       const item = await tx.consignmentItem.findUnique({
-        where: {
-          consignmentId_productId: { consignmentId, productId },
-        },
-        include: {
-          product: { select: { commissionRate: true, name: true } },
-        },
+        where: { consignmentId_productId: { consignmentId, productId } },
+        include: { product: { select: { name: true, sku: true } } },
       });
 
       if (!item) {
         throw new Error("Không tìm thấy sản phẩm trong lô ký gửi này");
       }
 
-      const available = InventoryService.computeAvailable(item);
-      if (quantity > available) {
-        throw new Error(
-          `Không đủ hàng. Yêu cầu: ${quantity}, còn tồn: ${available} (${item.product.name})`
-        );
-      }
-
       if (quantity <= 0) {
         throw new Error("Số lượng bán phải lớn hơn 0");
       }
 
-      await InventoryService.decreaseStock(tx, item.id, quantity);
+      const warnings: string[] = [];
+      const available = InventoryService.computeAvailable(item);
 
-      const commission = CommissionService.calculateSaleCommission(
-        quantity,
-        soldPrice,
-        item.product.commissionRate
-      );
+      // Cảnh báo nếu vượt tồn (không reject — nhân viên nhập tay)
+      if (quantity > available) {
+        warnings.push(
+          `Cảnh báo: "${item.product.name}" (${item.product.sku}) — ` +
+          `Yêu cầu ${quantity}, còn tồn ${available}. Cần xác nhận với đối tác.`
+        );
+      }
+
+      await InventoryService.decreaseStock(tx, item.id, quantity);
 
       const sale = await tx.sale.create({
         data: {
+          code: generateSaleCode(),
           quantity,
-          soldPrice: new Decimal(soldPrice),
-          grossAmount: commission.grossAmount,
-          soldAt: soldAt ?? new Date(),
+          soldPrice: soldPrice.toString() ,
+          soldAt: soldAt ? new Date(soldAt) : new Date(),
           note,
-          status: "COMPLETED",
+          status: "CONFIRMED",
           consignmentId,
           productId,
           storeId,
+          consignmentItemId: item.id,
+          salesReportDate,
+          salesReportRef,
+          reportedBy,
         },
       });
 
@@ -78,15 +85,13 @@ export class SaleService {
         consignmentId
       );
 
-      return { sale, consignmentStatus: newStatus, commission };
+      return { sale, consignmentStatus: newStatus, warnings };
     });
   }
 
   static async refundSale(saleId: string) {
     return prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.findUniqueOrThrow({
-        where: { id: saleId },
-      });
+      const sale = await tx.sale.findUniqueOrThrow({ where: { id: saleId } });
 
       if (sale.status === "CANCELLED") {
         throw new Error("Sale này đã được hoàn tiền");
@@ -125,9 +130,7 @@ export class SaleService {
       include: {
         product: true,
         store: true,
-        consignment: {
-          include: { consignor: true },
-        },
+        consignment: { include: { consignor: true } },
       },
     });
   }

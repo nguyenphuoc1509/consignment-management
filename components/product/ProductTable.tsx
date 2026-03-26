@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Eye, Edit2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,12 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Product } from "@/types/product";
-import { MOCK_CONSIGNORS } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
-
-function getConsignorName(id: string) {
-  return MOCK_CONSIGNORS.find((c) => c.id === id)?.companyName ?? id;
-}
 
 interface ProductTableProps {
   products: Product[];
@@ -28,38 +24,32 @@ interface ProductTableProps {
 function ProductCard({ product, onSelectDelete }: { product: Product; onSelectDelete: () => void }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4 dark:bg-zinc-900">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-3">
+        {product.imageUrl ? (
+          <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-border">
+            <Image
+              src={product.imageUrl}
+              alt={product.name}
+              fill
+              sizes="64px"
+              className="object-cover"
+            />
+          </div>
+        ) : (
+          <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center shrink-0 border border-border">
+            <span className="text-muted-foreground text-xs">Không có ảnh</span>
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm text-foreground truncate">{product.name}</p>
           <p className="font-mono text-xs text-muted-foreground mt-0.5">{product.sku}</p>
+          <p className="text-sm font-semibold text-foreground mt-1">{formatCurrency(product.price)}</p>
         </div>
-        <Badge variant={product.status === "ACTIVE" ? "default" : "secondary"} className="shrink-0 text-xs">
-          {product.status === "ACTIVE" ? "Hoạt động" : "Tạm ngưng"}
-        </Badge>
       </div>
 
       {product.description && (
         <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
       )}
-
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-        <div>
-          <p className="text-xs text-muted-foreground">Danh mục</p>
-          <Badge variant="secondary" className="mt-0.5 text-xs">{product.category}</Badge>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Bên giao hàng</p>
-          <p className="text-xs text-foreground mt-0.5 truncate">{getConsignorName(product.consignorId)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Giá</p>
-          <p className="text-sm font-semibold text-foreground">{formatCurrency(product.price)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Hoa hồng</p>
-          <p className="text-sm font-semibold text-primary">{product.commissionRate}%</p>
-        </div>
-      </div>
 
       <div className="flex items-center justify-end gap-1 border-t border-border pt-3">
         <Button variant="ghost" size="icon-xs" title="Xem chi tiết" asChild>
@@ -94,26 +84,41 @@ export function ProductTable({ products, onSelectDelete }: ProductTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-16">Ảnh</TableHead>
               <TableHead>Sản phẩm</TableHead>
               <TableHead>SKU</TableHead>
               <TableHead>Danh mục</TableHead>
-              <TableHead>Bên giao hàng</TableHead>
               <TableHead className="text-right">Giá</TableHead>
-              <TableHead className="text-center">Hoa hồng</TableHead>
-              <TableHead className="text-center">Trạng thái</TableHead>
               <TableHead className="text-right">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="h-32 text-center text-sm text-muted-foreground">
                   Không tìm thấy sản phẩm nào.
                 </TableCell>
               </TableRow>
             ) : (
               products.map((product) => (
                 <TableRow key={product.id}>
+                  <TableCell>
+                    {product.imageUrl ? (
+                      <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-border">
+                        <Image
+                          src={product.imageUrl}
+                          alt={product.name}
+                          fill
+                          sizes="40px"
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center border border-border">
+                        <span className="text-muted-foreground text-[8px]">N/A</span>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium text-sm text-foreground">
@@ -130,25 +135,10 @@ export function ProductTable({ products, onSelectDelete }: ProductTableProps) {
                     {product.sku}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{product.category}</Badge>
-                  </TableCell>
-                  <TableCell className="text-xs max-w-[150px] truncate">
-                    {getConsignorName(product.consignorId)}
+                    <Badge variant="secondary">{product.category ?? "—"}</Badge>
                   </TableCell>
                   <TableCell className="text-right font-medium text-sm">
                     {formatCurrency(product.price)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className="text-sm font-medium text-primary">
-                      {product.commissionRate}%
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={product.status === "ACTIVE" ? "default" : "secondary"}
-                    >
-                      {product.status === "ACTIVE" ? "Hoạt động" : "Tạm ngưng"}
-                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">

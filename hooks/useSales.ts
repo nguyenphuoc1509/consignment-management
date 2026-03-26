@@ -1,20 +1,41 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import {
-  MOCK_SALES,
-  MOCK_CONSIGNMENTS,
-  MOCK_CONSIGNMENT_ITEMS,
-  MOCK_CONSIGNORS,
-  MOCK_STORES,
-  MOCK_PRODUCTS,
-} from "@/lib/mock-data";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { api } from "@/lib/api/client";
 import { Sale, SaleStatus, SaleWithDetails } from "@/types/sale";
-import { ConsignmentItem } from "@/types/consignment";
+import { Consignment, ConsignmentItem } from "@/types/consignment";
+import { Store } from "@/types/store";
+import { Product } from "@/types/product";
+import { Consignor } from "@/types/consignor";
 import { useDebounce } from "./useDebounce";
 
+interface EnrichedConsignmentItem extends ConsignmentItem {
+  productName?: string;
+  productSku?: string;
+}
+
+interface CreateSaleInput {
+  consignmentId: string;
+  productId: string;
+  storeId: string;
+  consignmentItemId: string;
+  quantity: number;
+  soldPrice: number;
+  soldAt: string;
+  note?: string;
+}
+
 export function useSales() {
-  const [sales, setSales] = useState<Sale[]>(MOCK_SALES);
+  const [sales, setSales] = useState<SaleWithDetails[]>([]);
+  const [allSales, setAllSales] = useState<SaleWithDetails[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [consignments, setConsignments] = useState<Consignment[]>([]);
+  const [consignmentItems, setConsignmentItems] = useState<EnrichedConsignmentItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [consignors, setConsignors] = useState<Consignor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [storeFilter, setStoreFilter] = useState("all");
@@ -22,24 +43,109 @@ export function useSales() {
 
   const debouncedSearch = useDebounce(search);
 
+  const fetchSales = useCallback(async () => {
+    try {
+      const data = await api.get<SaleWithDetails[]>("/api/sales");
+      setSales(data);
+      setAllSales(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi khi tải danh sách bán hàng");
+    }
+  }, []);
+
+  const fetchStores = useCallback(async () => {
+    try {
+      const data = await api.get<Store[]>("/api/stores");
+      setStores(data);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách cửa hàng:", err);
+    }
+  }, []);
+
+  const fetchConsignments = useCallback(async () => {
+    try {
+      const data = await api.get<Consignment[]>("/api/consignments");
+      setConsignments(data);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách ký gửi:", err);
+    }
+  }, []);
+
+  const fetchProducts = useCallback(async () => {
+    try {
+      const data = await api.get<Product[]>("/api/products");
+      setProducts(data);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách sản phẩm:", err);
+    }
+  }, []);
+
+  const fetchConsignors = useCallback(async () => {
+    try {
+      const data = await api.get<Consignor[]>("/api/consignors");
+      setConsignors(data);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách consignor:", err);
+    }
+  }, []);
+
+  const fetchConsignmentItems = useCallback(async () => {
+    try {
+      const itemsMap: EnrichedConsignmentItem[] = [];
+      for (const consignment of consignments) {
+        try {
+          const items = await api.get<EnrichedConsignmentItem[]>(`/api/consignments/${consignment.id}/items`);
+          itemsMap.push(...items);
+        } catch {
+          // Skip if fails
+        }
+      }
+      setConsignmentItems(itemsMap);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách items:", err);
+    }
+  }, [consignments]);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchSales(),
+        fetchStores(),
+        fetchConsignments(),
+        fetchProducts(),
+        fetchConsignors(),
+      ]);
+      setLoading(false);
+    };
+    fetchAll();
+  }, [fetchSales, fetchStores, fetchConsignments, fetchProducts, fetchConsignors]);
+
+  useEffect(() => {
+    if (consignments.length > 0) {
+      fetchConsignmentItems();
+    }
+  }, [consignments, fetchConsignmentItems]);
+
   const enriched = useMemo((): SaleWithDetails[] => {
     return sales.map((s) => {
-      const consignment = MOCK_CONSIGNMENTS.find((c) => c.id === s.consignmentId);
+      const consignment = consignments.find((c) => c.id === s.consignmentId);
       const consignor = consignment
-        ? MOCK_CONSIGNORS.find((cg) => cg.id === consignment.consignorId)
+        ? consignors.find((cg) => cg.id === consignment.consignorId)
         : undefined;
-      const product = MOCK_PRODUCTS.find((p) => p.id === s.productId);
-      const store = MOCK_STORES.find((st) => st.id === s.storeId);
+      const product = products.find((p) => p.id === s.productId);
+      const store = stores.find((st) => st.id === s.storeId);
       return {
         ...s,
         consignmentCode: consignment?.code ?? s.consignmentId,
-        consignorName: consignor?.companyName ?? consignor?.id ?? s.consignmentId,
+        consignorName: consignor?.name ?? consignor?.id ?? s.consignmentId,
         productName: product?.name ?? s.productId,
         productSku: product?.sku ?? "",
         storeName: store?.name ?? s.storeId,
       };
     });
-  }, [sales]);
+  }, [sales, consignments, consignors, products, stores]);
 
   const filtered = useMemo(() => {
     return enriched.filter((s) => {
@@ -47,6 +153,7 @@ export function useSales() {
       const matchSearch =
         !q ||
         s.id.toLowerCase().includes(q) ||
+        s.code?.toLowerCase().includes(q) ||
         s.consignmentCode.toLowerCase().includes(q) ||
         s.productName.toLowerCase().includes(q) ||
         s.storeName.toLowerCase().includes(q) ||
@@ -80,67 +187,100 @@ export function useSales() {
     return counts;
   }, [sales]);
 
-  function deleteSale(saleOrId: SaleWithDetails | string) {
+  async function deleteSale(saleOrId: SaleWithDetails | string) {
     const id = typeof saleOrId === "string" ? saleOrId : saleOrId.id;
-    setSales((prev) => prev.filter((s) => s.id !== id));
+    try {
+      await api.delete(`/api/sales/${id}`);
+      setSales((prev) => prev.filter((s) => s.id !== id));
+      setAllSales((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Lỗi khi xóa bán hàng");
+    }
   }
 
-  function cancelSale(id: string) {
-    setSales((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? { ...s, status: "CANCELLED", updatedAt: new Date().toISOString() }
-          : s
-      )
-    );
+  async function cancelSale(id: string) {
+    try {
+      await api.patch(`/api/sales/${id}`, { status: "CANCELLED" });
+      setSales((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? { ...s, status: "CANCELLED" as const, updatedAt: new Date().toISOString() }
+            : s
+        )
+      );
+      setAllSales((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? { ...s, status: "CANCELLED" as const, updatedAt: new Date().toISOString() }
+            : s
+        )
+      );
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Lỗi khi hủy bán hàng");
+    }
   }
 
-  function addSale(
+  async function addSale(
     data: Omit<Sale, "id" | "createdAt" | "updatedAt"> & {
       soldAt: string;
     }
-  ): Sale | null {
-    const consignment = MOCK_CONSIGNMENTS.find((c) => c.id === data.consignmentId);
-    if (!consignment) return null;
-
-    const item = MOCK_CONSIGNMENT_ITEMS.find(
-      (i) => i.consignmentId === data.consignmentId && i.productId === data.productId
-    );
-    if (!item) return null;
-
-    const available =
-      item.quantitySent -
-      item.quantitySold -
-      item.quantityReturned -
-      item.quantityDamaged;
+  ): Promise<SaleWithDetails | null> {
+    const available = getAvailableQuantity(data.consignmentId, data.productId);
     if (data.quantity > available) {
       return null;
     }
 
-    const now = new Date().toISOString();
-    const newSale: Sale = {
-      ...data,
-      id: `SL-${String(Date.now()).slice(-6)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setSales((prev) => [newSale, ...prev]);
-    return newSale;
+    try {
+      const input: CreateSaleInput = {
+        consignmentId: data.consignmentId,
+        productId: data.productId,
+        storeId: data.storeId,
+        consignmentItemId: data.consignmentItemId,
+        quantity: data.quantity,
+        soldPrice: data.soldPrice,
+        soldAt: data.soldAt,
+        note: data.note,
+      };
+
+      const newSale = await api.post<SaleWithDetails>("/api/sales", input);
+      setSales((prev) => [newSale, ...prev]);
+      setAllSales((prev) => [newSale, ...prev]);
+      return newSale;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Lỗi khi thêm bán hàng");
+    }
   }
 
   function getSale(id: string): SaleWithDetails | null {
     const s = sales.find((s) => s.id === id);
-    if (!s) return null;
-    const consignment = MOCK_CONSIGNMENTS.find((c) => c.id === s.consignmentId);
+    if (!s) {
+      const sFromAll = allSales.find((s) => s.id === id);
+      if (!sFromAll) return null;
+      const consignment = consignments.find((c) => c.id === sFromAll.consignmentId);
+      const consignor = consignment
+        ? consignors.find((cg) => cg.id === consignment.consignorId)
+        : undefined;
+      const product = products.find((p) => p.id === sFromAll.productId);
+      const store = stores.find((st) => st.id === sFromAll.storeId);
+      return {
+        ...sFromAll,
+        consignmentCode: consignment?.code ?? sFromAll.consignmentId,
+        consignorName: consignor?.name ?? consignor?.id ?? sFromAll.consignmentId,
+        productName: product?.name ?? sFromAll.productId,
+        productSku: product?.sku ?? "",
+        storeName: store?.name ?? sFromAll.storeId,
+      };
+    }
+    const consignment = consignments.find((c) => c.id === s.consignmentId);
     const consignor = consignment
-      ? MOCK_CONSIGNORS.find((cg) => cg.id === consignment.consignorId)
+      ? consignors.find((cg) => cg.id === consignment.consignorId)
       : undefined;
-    const product = MOCK_PRODUCTS.find((p) => p.id === s.productId);
-    const store = MOCK_STORES.find((st) => st.id === s.storeId);
+    const product = products.find((p) => p.id === s.productId);
+    const store = stores.find((st) => st.id === s.storeId);
     return {
       ...s,
       consignmentCode: consignment?.code ?? s.consignmentId,
-      consignorName: consignor?.companyName ?? consignor?.id ?? s.consignmentId,
+      consignorName: consignor?.name ?? consignor?.id ?? s.consignmentId,
       productName: product?.name ?? s.productId,
       productSku: product?.sku ?? "",
       storeName: store?.name ?? s.storeId,
@@ -148,7 +288,7 @@ export function useSales() {
   }
 
   function getAvailableQuantity(consignmentId: string, productId: string): number {
-    const item = MOCK_CONSIGNMENT_ITEMS.find(
+    const item = consignmentItems.find(
       (i) => i.consignmentId === consignmentId && i.productId === productId
     );
     if (!item) return 0;
@@ -182,9 +322,12 @@ export function useSales() {
     addSale,
     getSale,
     getAvailableQuantity,
-    stores: MOCK_STORES,
-    consignments: MOCK_CONSIGNMENTS,
-    products: MOCK_PRODUCTS,
-    consignors: MOCK_CONSIGNORS,
+    stores,
+    consignments,
+    products,
+    consignors,
+    loading,
+    error,
+    refetch: fetchSales,
   };
 }

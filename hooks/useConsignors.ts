@@ -1,26 +1,47 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { MOCK_CONSIGNORS } from "@/lib/mock-data";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { api } from "@/lib/api/client";
 import { Consignor } from "@/types/consignor";
 import { useDebounce } from "./useDebounce";
 
 export function useConsignors() {
-  const [consignors, setConsignors] = useState<Consignor[]>(MOCK_CONSIGNORS);
+  const [consignors, setConsignors] = useState<Consignor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const debouncedSearch = useDebounce(search);
+
+  const fetchConsignors = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.get<Consignor[]>("/api/consignors");
+      setConsignors(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch consignors");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConsignors();
+  }, [fetchConsignors]);
 
   const filtered = useMemo(() => {
     return consignors.filter((c) => {
       const q = debouncedSearch.toLowerCase();
       const matchSearch =
         !q ||
-        c.companyName.toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q) ||
         c.code.toLowerCase().includes(q) ||
-        c.contactPerson.toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
+        (c.managerName && c.managerName.toLowerCase().includes(q)) ||
+        (c.managerPhone && c.managerPhone.includes(q)) ||
+        (c.contactPerson && c.contactPerson.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q)) ||
         (c.email && c.email.toLowerCase().includes(q));
       const matchStatus =
         statusFilter === "all" || c.status === statusFilter;
@@ -32,31 +53,36 @@ export function useConsignors() {
   const active = consignors.filter((c) => c.status === "ACTIVE").length;
   const inactive = consignors.filter((c) => c.status === "INACTIVE").length;
 
-  function deleteConsignor(consignorOrId: Consignor | string) {
+  async function deleteConsignor(consignorOrId: Consignor | string) {
     const id = typeof consignorOrId === "string" ? consignorOrId : consignorOrId.id;
-    setConsignors((prev) => prev.filter((c) => c.id !== id));
+    try {
+      await api.delete(`/api/consignors/${id}`);
+      setConsignors((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to delete consignor");
+    }
   }
 
-  function updateConsignor(id: string, data: Partial<Consignor>) {
-    setConsignors((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, ...data, updatedAt: new Date().toISOString() }
-          : c
-      )
-    );
+  async function updateConsignor(id: string, data: Partial<Consignor>) {
+    try {
+      const updated = await api.put<Consignor>(`/api/consignors/${id}`, data);
+      setConsignors((prev) =>
+        prev.map((c) => (c.id === id ? updated : c))
+      );
+      return updated;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to update consignor");
+    }
   }
 
-  function addConsignor(data: Omit<Consignor, "id" | "createdAt" | "updatedAt">) {
-    const now = new Date().toISOString();
-    const newConsignor: Consignor = {
-      ...data,
-      id: `CG-${String(Date.now()).slice(-6)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setConsignors((prev) => [newConsignor, ...prev]);
-    return newConsignor;
+  async function addConsignor(data: Omit<Consignor, "id" | "createdAt" | "updatedAt">) {
+    try {
+      const newConsignor = await api.post<Consignor>("/api/consignors", data);
+      setConsignors((prev) => [newConsignor, ...prev]);
+      return newConsignor;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to add consignor");
+    }
   }
 
   function getConsignor(id: string) {
@@ -66,6 +92,8 @@ export function useConsignors() {
   return {
     consignors,
     filtered,
+    loading,
+    error,
     filters: {
       search,
       statusFilter,
@@ -77,5 +105,6 @@ export function useConsignors() {
     updateConsignor,
     addConsignor,
     getConsignor,
+    refetch: fetchConsignors,
   };
 }

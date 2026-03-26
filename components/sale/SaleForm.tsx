@@ -16,14 +16,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Sale, SaleStatus } from "@/types/sale";
-import { Consignment, ConsignmentItem } from "@/types/consignment";
+import { ConsignmentWithItems, ConsignmentItem } from "@/types/consignment";
 import { Store } from "@/types/store";
 import { Product } from "@/types/product";
 
 interface SaleFormProps {
   sale?: Sale;
   stores: Store[];
-  consignments: Consignment[];
+  consignments: ConsignmentWithItems[];
   products: Product[];
   getAvailableQuantity: (consignmentId: string, productId: string) => number;
   onSubmit?: (data: Omit<Sale, "id" | "createdAt" | "updatedAt">) => void;
@@ -71,18 +71,11 @@ export function SaleForm({
   // Products available in selected consignment
   const consignmentItems = consignments
     .find((c) => c.id === form.consignmentId)
-    ?.id
-    ? (() => {
-        const { MOCK_CONSIGNMENT_ITEMS } = require("@/lib/mock-data");
-        return MOCK_CONSIGNMENT_ITEMS.filter(
-          (i: ConsignmentItem) => i.consignmentId === form.consignmentId
-        );
-      })()
-    : [];
+    ?.items ?? [];
 
   // Filter consignments: only active ones sent to a store
   const activeConsignments = consignments.filter((c) =>
-    ["SENT", "PARTIAL_SOLD"].includes(c.status)
+    ["SHIPPED", "PARTIAL_SOLD"].includes(c.status)
   );
 
   function validate(): boolean {
@@ -190,12 +183,12 @@ export function SaleForm({
                 <SelectValue placeholder="Chọn sản phẩm..." />
               </SelectTrigger>
               <SelectContent>
-                {Array.isArray(consignmentItems) && consignmentItems.length === 0 ? (
+                {consignmentItems.length === 0 ? (
                   <div className="px-3 py-2 text-sm text-muted-foreground">
                     Không có sản phẩm trong lô này.
                   </div>
                 ) : (
-                  (Array.isArray(consignmentItems) ? consignmentItems : []).map((item: ConsignmentItem) => {
+                  consignmentItems.map((item: ConsignmentItem) => {
                     const product = products.find((p) => p.id === item.productId);
                     if (!product) return null;
                     return (

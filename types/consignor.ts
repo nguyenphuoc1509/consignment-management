@@ -1,12 +1,20 @@
+// Types aligned with Prisma schema.
 export type Consignor = {
-    id: string;
-    companyName: string;
-    code: string;
-    contactPerson: string;
-    phone: string;
-    email?: string;
-    address: string;
-    status: "ACTIVE" | "INACTIVE";
-    createdAt: string;
-    updatedAt: string;
-  };
+  id: string;
+  type: "WAREHOUSE" | "EXTERNAL";
+  code: string;
+  name: string;
+  address: string;
+  managerName?: string;
+  managerPhone?: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  note?: string;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+  /** Form alias — maps to `name` when sent to API */
+  companyName?: string;
+};

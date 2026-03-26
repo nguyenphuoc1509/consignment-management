@@ -1,13 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import {
   Hash,
   Tag,
-  Store,
   DollarSign,
-  Percent,
   FileText,
   ImageIcon,
   Calendar,
@@ -15,7 +12,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Product } from "@/types/product";
-import { MOCK_CONSIGNORS } from "@/lib/mock-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface InfoRowProps {
@@ -45,8 +41,6 @@ interface ProductDetailInfoProps {
 }
 
 export function ProductDetailInfo({ product }: ProductDetailInfoProps) {
-  const consignor = MOCK_CONSIGNORS.find((c) => c.id === product.consignorId);
-
   return (
     <>
       {/* Image + info in one card */}
@@ -80,24 +74,7 @@ export function ProductDetailInfo({ product }: ProductDetailInfoProps) {
           <InfoRow
             icon={Tag}
             label="Danh mục"
-            value={<Badge variant="secondary">{product.category}</Badge>}
-          />
-          <div className="mx-4 border-t border-border" />
-          <InfoRow
-            icon={Store}
-            label="Bên giao hàng"
-            value={
-              consignor ? (
-                <Link
-                  href="/dashboard/consignors"
-                  className="text-primary hover:underline"
-                >
-                  {consignor.companyName}
-                </Link>
-              ) : (
-                product.consignorId
-              )
-            }
+            value={<Badge variant="secondary">{product.category ?? "—"}</Badge>}
           />
           <div className="mx-4 border-t border-border" />
           <InfoRow
@@ -108,12 +85,6 @@ export function ProductDetailInfo({ product }: ProductDetailInfoProps) {
                 {formatCurrency(product.price)}
               </span>
             }
-          />
-          <div className="mx-4 border-t border-border" />
-          <InfoRow
-            icon={Percent}
-            label="Tỷ lệ hoa hồng"
-            value={<span className="font-medium">{product.commissionRate}%</span>}
           />
           <div className="mx-4 border-t border-border" />
           <InfoRow

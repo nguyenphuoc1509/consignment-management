@@ -74,7 +74,7 @@ export function ConsignmentDetailView({
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-0.5">
-              <p className="font-medium text-sm text-foreground">{consignor.companyName}</p>
+              <p className="font-medium text-sm text-foreground">{consignor.companyName ?? consignor.name}</p>
               <p className="font-mono text-xs text-muted-foreground">{consignor.code}</p>
             </div>
             <div className="flex items-center gap-2">

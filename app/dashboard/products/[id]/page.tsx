@@ -1,17 +1,16 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProductForm } from "@/components/product/ProductForm";
 import {
   ProductDetailHeader,
   ProductDetailInfo,
-  ProductCommissionCard,
   ProductNotFound,
 } from "@/components/product";
+import { SuccessDialog, FailDialog } from "@/components/dialog";
 import { DeleteDialog } from "@/components/deleteDialog/DeleteDialog";
 import { useProducts } from "@/hooks/useProducts";
-import { useConsignors } from "@/hooks/useConsignors";
 import { Product } from "@/types/product";
 
 export default function ProductDetailPage({
@@ -25,21 +24,58 @@ export default function ProductDetailPage({
   const isEditMode = searchParams.get("edit") === "true";
 
   const { getProduct, updateProduct, deleteProduct } = useProducts();
-  const { consignors } = useConsignors();
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loadingProduct, setLoadingProduct] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [isEditing, setIsEditing] = useState(isEditMode);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [failOpen, setFailOpen] = useState(false);
+  const [failMessage, setFailMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const product = getProduct(id);
+  useEffect(() => {
+    setLoadingProduct(true);
+    getProduct(id)
+      .then(setProduct)
+      .catch(() => setProduct(null))
+      .finally(() => setLoadingProduct(false));
+  }, [id, getProduct]);
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteTarget) return;
-    deleteProduct(deleteTarget.id);
-    router.push("/dashboard/products");
+    try {
+      await deleteProduct(deleteTarget);
+      router.push("/dashboard/products");
+    } catch (err) {
+      setFailMessage(err instanceof Error ? err.message : "Xóa sản phẩm thất bại.");
+      setFailOpen(true);
+    }
   }
 
-  function handleEditSubmit(data: Partial<Product>) {
-    updateProduct(id, data);
-    setIsEditing(false);
+  async function handleEditSubmit(data: Partial<Product>) {
+    setIsLoading(true);
+    try {
+      const updated = await updateProduct(id, data);
+      setProduct(updated);
+      setIsEditing(false);
+      setSuccessOpen(true);
+    } catch (err) {
+      setFailMessage(err instanceof Error ? err.message : "Cập nhật sản phẩm thất bại.");
+      setFailOpen(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (loadingProduct) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center justify-center py-20">
+          <p className="text-sm text-muted-foreground">Đang tải...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!product) {
@@ -51,42 +87,55 @@ export default function ProductDetailPage({
   }
 
   return (
-    <div className="flex flex-col gap-5 max-w-7xl mx-auto">
-      {/* Header */}
-      <ProductDetailHeader
-        product={product}
-        isEditing={isEditing}
-        onEdit={() => setIsEditing(true)}
-        onCancelEdit={() => setIsEditing(false)}
-        onDelete={() => setDeleteTarget(product)}
-      />
+    <>
+      <div className="flex flex-col gap-5 max-w-7xl mx-auto">
+        {/* Header */}
+        <ProductDetailHeader
+          product={product}
+          isEditing={isEditing}
+          onEdit={() => setIsEditing(true)}
+          onCancelEdit={() => setIsEditing(false)}
+          onDelete={() => setDeleteTarget(product)}
+        />
 
-      {/* Edit form or detail view */}
-      {isEditing ? (
-        <div className="rounded-xl border border-border bg-white p-5 dark:bg-zinc-900">
-          <h3 className="text-base font-semibold text-foreground mb-5">
-            Chỉnh sửa sản phẩm
-          </h3>
-          <ProductForm
-            product={product}
-            consignors={consignors.map((c) => ({ id: c.id, companyName: c.companyName }))}
-            onSubmit={handleEditSubmit}
-          />
-        </div>
-      ) : (
-        <>
+        {/* Edit form or detail view */}
+        {isEditing ? (
+          <div className="rounded-xl border border-border bg-white p-5 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold text-foreground mb-5">
+              Chỉnh sửa sản phẩm
+            </h3>
+            <ProductForm
+              product={product}
+              onSubmit={handleEditSubmit}
+              isLoading={isLoading}
+            />
+          </div>
+        ) : (
           <ProductDetailInfo product={product} />
-          <ProductCommissionCard product={product} />
-        </>
-      )}
+        )}
 
-      {/* Delete dialog */}
-      <DeleteDialog
-        target={deleteTarget}
-        itemLabel="sản phẩm"
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        {/* Delete dialog */}
+        <DeleteDialog
+          target={deleteTarget}
+          itemLabel="sản phẩm"
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+        />
+      </div>
+
+      <SuccessDialog
+        open={successOpen}
+        title="Cập nhật thành công"
+        message="Thông tin sản phẩm đã được lưu."
+        onClose={() => setSuccessOpen(false)}
       />
-    </div>
+
+      <FailDialog
+        open={failOpen}
+        title="Thất bại"
+        message={failMessage}
+        onClose={() => setFailOpen(false)}
+      />
+    </>
   );
 }
