@@ -17,6 +17,7 @@ import { formatCurrency } from "@/lib/utils";
 import {
   Building2,
   Store as StoreIcon,
+  Warehouse as WarehouseIcon,
   Calendar,
   Package,
   User,
@@ -25,12 +26,13 @@ import {
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<ConsignmentStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  PENDING: { label: "Chờ gửi", variant: "secondary" },
-  SENT: { label: "Đã gửi", variant: "default" },
+  DRAFT: { label: "Nháp", variant: "secondary" },
+  SHIPPED: { label: "Đã gửi", variant: "default" },
   PARTIAL_SOLD: { label: "Bán một phần", variant: "outline" },
   COMPLETED: { label: "Hoàn thành", variant: "default" },
   RETURNED: { label: "Đã trả về", variant: "secondary" },
   SETTLED: { label: "Đã đối soát", variant: "secondary" },
+  CANCELLED: { label: "Đã hủy", variant: "destructive" },
 };
 
 interface ConsignmentDetailViewProps {
@@ -65,7 +67,7 @@ export function ConsignmentDetailView({
   return (
     <div className="flex flex-col gap-5">
       {/* Info cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Consignor card */}
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4 dark:bg-zinc-900">
           <div className="flex items-center gap-2">
@@ -74,7 +76,7 @@ export function ConsignmentDetailView({
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-0.5">
-              <p className="font-medium text-sm text-foreground">{consignor.companyName ?? consignor.name}</p>
+              <p className="font-medium text-sm text-foreground">{consignor.name}</p>
               <p className="font-mono text-xs text-muted-foreground">{consignor.code}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -93,6 +95,24 @@ export function ConsignmentDetailView({
             )}
           </div>
         </div>
+
+        {/* Warehouse card — only shown if warehouseId exists */}
+        {consignment.warehouseId && (
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4 dark:bg-zinc-900">
+            <div className="flex items-center gap-2">
+              <WarehouseIcon className="size-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Kho lấy hàng</h3>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-0.5">
+                <p className="font-medium text-sm text-foreground">{consignment.warehouseName ?? consignment.warehouse?.name ?? "—"}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Lấy hàng từ kho này để gửi đến cửa hàng.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Store card */}
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4 dark:bg-zinc-900">
@@ -147,10 +167,10 @@ export function ConsignmentDetailView({
             </span>
           </div>
         )}
-        {consignment.notes && (
+        {consignment.note && (
           <div className="flex items-center gap-2 text-sm w-full">
             <span className="text-muted-foreground">Ghi chú:</span>
-            <span className="text-foreground">{consignment.notes}</span>
+            <span className="text-foreground">{consignment.note}</span>
           </div>
         )}
       </div>

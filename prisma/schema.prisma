@@ -73,7 +73,7 @@ model User {
 
 model Consignor {
   id            String        @id @default(cuid())
-  type          ConsignorType @default(WAREHOUSE)
+  type          ConsignorType @default(EXTERNAL)
   code          String        @unique
   name          String
   address       String
@@ -88,6 +88,7 @@ model Consignor {
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?
 
+  warehouses   Warehouse[]
   consignments Consignment[]
 
   @@map("consignors")
@@ -104,7 +105,8 @@ model Product {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
-  consignmentItems ConsignmentItem[]
+  consignmentItems    ConsignmentItem[]
+  warehouseInventories WarehouseInventory[]
   sales            Sale[]
   returnItems      ConsignmentReturnItem[]
   @@map("products")
@@ -135,15 +137,56 @@ model Store {
   @@map("stores")
 }
 
+model Warehouse {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  name          String
+  address       String?
+  contactPerson String?
+  phone         String?
+  note          String?
+  status        RecordStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+
+  consignorId   String
+  consignor     Consignor @relation(fields: [consignorId], references: [id], onDelete: Cascade)
+  inventory     WarehouseInventory[]
+  consignments Consignment[]
+
+  @@index([consignorId])
+  @@map("warehouses")
+}
+
+model WarehouseInventory {
+  id          String    @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity    Int       @default(0)
+  reserved    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([warehouseId, productId])
+  @@index([warehouseId])
+  @@index([productId])
+  @@map("warehouse_inventories")
+}
+
 model Consignment {
   id                 String            @id @default(cuid())
   code               String            @unique
   consignorId        String
   consignor          Consignor         @relation(fields: [consignorId], references: [id])
+  warehouseId        String?
+  warehouse          Warehouse?        @relation(fields: [warehouseId], references: [id])
   storeId            String
   store              Store             @relation(fields: [storeId], references: [id])
   sentDate           DateTime
-  expectedReturnDate DateTime
+  expectedReturnDate DateTime?
   actualReturnDate   DateTime?
   reportReceivedAt   DateTime?
   reportNote         String?
@@ -158,6 +201,7 @@ model Consignment {
   returns          ConsignmentReturn[]
 
   @@index([consignorId])
+  @@index([warehouseId])
   @@index([storeId])
   @@map("consignments")
 }

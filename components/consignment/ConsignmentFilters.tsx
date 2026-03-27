@@ -14,12 +14,13 @@ import { Store } from "@/types/store";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Tất cả trạng thái" },
-  { value: "PENDING", label: "Chờ gửi" },
-  { value: "SENT", label: "Đã gửi" },
+  { value: "DRAFT", label: "Nháp" },
+  { value: "SHIPPED", label: "Đã gửi" },
   { value: "PARTIAL_SOLD", label: "Bán một phần" },
   { value: "COMPLETED", label: "Hoàn thành" },
   { value: "RETURNED", label: "Đã trả về" },
   { value: "SETTLED", label: "Đã đối soát" },
+  { value: "CANCELLED", label: "Đã hủy" },
 ];
 
 interface ConsignmentFiltersProps {
@@ -68,7 +69,7 @@ export function ConsignmentFilters({
             <SelectItem value="all">Tất cả bên giao</SelectItem>
             {consignors.map((cg) => (
               <SelectItem key={cg.id} value={cg.id}>
-                {cg.companyName}
+                {cg.name}
               </SelectItem>
             ))}
           </SelectContent>

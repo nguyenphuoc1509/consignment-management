@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { ConsignmentWithItems, ConsignmentStatus } from "@/types/consignment";
 
 const STATUS_CONFIG: Record<ConsignmentStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  PENDING: { label: "Chờ gửi", variant: "secondary" },
-  SENT: { label: "Đã gửi", variant: "default" },
+  DRAFT: { label: "Nháp", variant: "secondary" },
+  SHIPPED: { label: "Đã gửi", variant: "default" },
   PARTIAL_SOLD: { label: "Bán một phần", variant: "outline" },
   COMPLETED: { label: "Hoàn thành", variant: "default" },
   RETURNED: { label: "Đã trả về", variant: "secondary" },
   SETTLED: { label: "Đã đối soát", variant: "secondary" },
+  CANCELLED: { label: "Đã hủy", variant: "destructive" },
 };
 
 interface ConsignmentDetailHeaderProps {
@@ -70,10 +71,17 @@ export function ConsignmentDetailHeader({
               <span className="hidden sm:inline">Chỉnh sửa</span>
               <span className="sm:hidden">Sửa</span>
             </Button>
-            <Button variant="destructive" size="sm" onClick={onDelete}>
-              <Trash2 className="size-4" />
-              <span className="hidden sm:inline">Xóa</span>
-            </Button>
+            {consignment.status === "DRAFT" ? (
+              <Button variant="destructive" size="sm" onClick={onDelete}>
+                <Trash2 className="size-4" />
+                <span className="hidden sm:inline">Xóa</span>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled title="Chỉ có thể xóa lô ở trạng thái Nháp">
+                <Trash2 className="size-4" />
+                <span className="hidden sm:inline">Xóa</span>
+              </Button>
+            )}
           </>
         )}
       </div>

@@ -15,6 +15,7 @@ import {
   ConsignmentItem,
   ConsignmentWithItems,
 } from "@/types/consignment";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ConsignmentDetailPage({
   params,
@@ -33,6 +34,7 @@ export default function ConsignmentDetailPage({
     consignors,
     stores,
     products,
+    loading,
   } = useConsignments();
 
   const [deleteTarget, setDeleteTarget] = useState<ConsignmentWithItems | null>(null);
@@ -52,8 +54,24 @@ export default function ConsignmentDetailPage({
     data: Partial<Consignment>,
     items: Omit<ConsignmentItem, "id" | "consignmentId">[]
   ) {
-    updateConsignment(id, data);
+    updateConsignment(id, data, items);
     setIsEditing(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5 max-w-7xl mx-auto animate-pulse">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 rounded-md" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
+      </div>
+    );
   }
 
   if (!consignment) {
@@ -85,7 +103,6 @@ export default function ConsignmentDetailPage({
             consignment={consignment}
             consignors={consignors}
             stores={stores}
-            products={products}
             onSubmitEdit={handleEditSubmit}
           />
         </div>

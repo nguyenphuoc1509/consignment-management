@@ -73,7 +73,7 @@ export default function ConsignorDetailPage({
       {/* Delete dialog */}
       <DeleteDialog
         target={deleteTarget}
-        itemLabel="kho cung cấp"
+        itemLabel="kho sản xuất"
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />

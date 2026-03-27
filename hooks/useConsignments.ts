@@ -50,8 +50,8 @@ export function useConsignments() {
         for (const c of raw) {
           if (c.consignmentItems && Array.isArray(c.consignmentItems)) {
             allItems.push(...c.consignmentItems);
-            const { consignmentItems: _ci, consignor, store, ...rest } = c;
-            consignmentList.push({ ...rest, consignorName: consignor?.name, storeName: store?.name });
+            const { consignmentItems: _ci, consignor, store, warehouse, ...rest } = c;
+            consignmentList.push({ ...rest, consignorName: consignor?.name, storeName: store?.name, warehouseName: warehouse?.name });
           } else {
             consignmentList.push(c);
           }
@@ -130,12 +130,38 @@ export function useConsignments() {
     }
   }, []);
 
-  const updateConsignment = useCallback(async (id: string, data: Partial<Consignment>) => {
+  const updateConsignment = useCallback(async (
+    id: string,
+    data: Partial<Consignment>,
+    items?: Omit<ConsignmentItem, "id" | "consignmentId">[]
+  ) => {
     try {
-      const updated = await api.put<Consignment>(`/api/consignments/${id}`, data);
+      const payload = { ...data, ...(items && { items }) };
+      const updated = await api.put<Consignment>(`/api/consignments/${id}`, payload);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = updated as any;
+
+      // Cập nhật consignments state với dữ liệu mới
       setConsignments((prev) =>
         prev.map((c) => (c.id === id ? { ...updated, updatedAt: new Date().toISOString() } : c))
       );
+
+      // Cập nhật items state bằng cách merge với dữ liệu cũ (giữ nguyên id)
+      if (items && items.length > 0) {
+        setItems((prev) => {
+          const existingForThis = prev.filter((i) => i.consignmentId === id);
+          const updatedQtyMap: Record<string, number> = {};
+          for (const item of items) {
+            updatedQtyMap[item.productId] = item.quantitySent;
+          }
+          return prev.map((i) => {
+            if (i.consignmentId === id && updatedQtyMap[i.productId] !== undefined) {
+              return { ...i, quantitySent: updatedQtyMap[i.productId] };
+            }
+            return i;
+          });
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update consignment");
       throw err;

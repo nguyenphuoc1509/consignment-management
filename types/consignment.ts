@@ -14,6 +14,7 @@ export type Consignment = {
   id: string;
   code: string;
   consignorId: string;
+  warehouseId?: string;
   storeId: string;
   sentDate: string;
   expectedReturnDate?: string;
@@ -26,8 +27,10 @@ export type Consignment = {
   updatedAt: string;
   consignorName?: string;
   storeName?: string;
+  warehouseName?: string;
   consignor?: { name: string };
   store?: { name: string };
+  warehouse?: { name: string };
   consignmentItems?: ConsignmentItem[];
 };
 

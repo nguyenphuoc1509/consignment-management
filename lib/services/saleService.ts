@@ -1,6 +1,5 @@
 // lib/services/saleService.ts
 import prisma from "@/lib/prisma";
-import { InventoryService } from "./inventoryService";
 import { ConsignmentService } from "./consignmentService";
 
 function generateSaleCode(): string {
@@ -49,24 +48,20 @@ export class SaleService {
         throw new Error("Số lượng bán phải lớn hơn 0");
       }
 
+      // TODO: kiểm tra hàng tồn kho trước khi bán
       const warnings: string[] = [];
-      const available = InventoryService.computeAvailable(item);
 
-      // Cảnh báo nếu vượt tồn (không reject — nhân viên nhập tay)
-      if (quantity > available) {
-        warnings.push(
-          `Cảnh báo: "${item.product.name}" (${item.product.sku}) — ` +
-          `Yêu cầu ${quantity}, còn tồn ${available}. Cần xác nhận với đối tác.`
-        );
-      }
-
-      await InventoryService.decreaseStock(tx, item.id, quantity);
+      // Cập nhật quantitySold trong ConsignmentItem
+      await tx.consignmentItem.update({
+        where: { id: item.id },
+        data: { quantitySold: { increment: quantity } },
+      });
 
       const sale = await tx.sale.create({
         data: {
           code: generateSaleCode(),
           quantity,
-          soldPrice: soldPrice.toString() ,
+          soldPrice: soldPrice.toString(),
           soldAt: soldAt ? new Date(soldAt) : new Date(),
           note,
           status: "CONFIRMED",
@@ -97,7 +92,11 @@ export class SaleService {
         throw new Error("Sale này đã được hoàn tiền");
       }
 
-      await InventoryService.increaseStockFromRefund(tx, sale.consignmentItemId, sale.quantity);
+      // TODO: kiểm tra và cập nhật hàng tồn kho khi hoàn tiền
+      await tx.consignmentItem.update({
+        where: { id: sale.consignmentItemId },
+        data: { quantitySold: { decrement: sale.quantity } },
+      });
 
       const updatedSale = await tx.sale.update({
         where: { id: saleId },

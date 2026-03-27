@@ -9,12 +9,13 @@ interface ConsignmentSummaryCardsProps {
 }
 
 const STATUS_LABELS: Record<ConsignmentStatus, string> = {
-  PENDING: "Chờ gửi",
-  SENT: "Đã gửi",
+  DRAFT: "Nháp",
+  SHIPPED: "Đã gửi",
   PARTIAL_SOLD: "Bán một phần",
   COMPLETED: "Hoàn thành",
   RETURNED: "Đã trả về",
   SETTLED: "Đã đối soát",
+  CANCELLED: "Đã hủy",
 };
 
 export function ConsignmentSummaryCards({
@@ -22,7 +23,7 @@ export function ConsignmentSummaryCards({
   byStatus,
 }: ConsignmentSummaryCardsProps) {
   const active =
-    byStatus.PENDING + byStatus.SENT + byStatus.PARTIAL_SOLD;
+    byStatus.DRAFT + byStatus.SHIPPED + byStatus.PARTIAL_SOLD;
 
   return (
     <div className="grid gap-3 sm:grid-cols-4">

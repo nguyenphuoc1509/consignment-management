@@ -17,12 +17,13 @@ import { Consignor } from "@/types/consignor";
 import { Store } from "@/types/store";
 
 const STATUS_CONFIG: Record<ConsignmentStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  PENDING: { label: "Chờ gửi", variant: "secondary" },
-  SENT: { label: "Đã gửi", variant: "default" },
+  DRAFT: { label: "Nháp", variant: "secondary" },
+  SHIPPED: { label: "Đã gửi", variant: "default" },
   PARTIAL_SOLD: { label: "Bán một phần", variant: "outline" },
   COMPLETED: { label: "Hoàn thành", variant: "default" },
   RETURNED: { label: "Đã trả về", variant: "secondary" },
   SETTLED: { label: "Đã đối soát", variant: "secondary" },
+  CANCELLED: { label: "Đã hủy", variant: "destructive" },
 };
 
 interface ConsignmentTableProps {
@@ -95,8 +96,9 @@ function ConsignmentCard({
         <Button
           variant="ghost"
           size="icon-xs"
-          title="Xóa"
-          className="text-destructive hover:text-destructive"
+          title={consignment.status === "DRAFT" ? "Xóa" : "Chỉ có thể xóa lô ở trạng thái Nháp"}
+          className={consignment.status === "DRAFT" ? "text-destructive hover:text-destructive" : "text-muted-foreground cursor-not-allowed"}
+          disabled={consignment.status !== "DRAFT"}
           onClick={onDelete}
         >
           <Trash2 className="size-3" />
@@ -113,7 +115,7 @@ export function ConsignmentTable({
   onDelete,
 }: ConsignmentTableProps) {
   function getConsignorName(id: string) {
-    return consignors.find((c) => c.id === id)?.companyName ?? id;
+    return consignors.find((c) => c.id === id)?.name ?? id;
   }
   function getStoreName(id: string) {
     return stores.find((s) => s.id === id)?.name ?? id;
@@ -195,8 +197,9 @@ export function ConsignmentTable({
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          title="Xóa"
-                          className="text-destructive hover:text-destructive"
+                          title={c.status === "DRAFT" ? "Xóa" : "Chỉ có thể xóa lô ở trạng thái Nháp"}
+                          className={c.status === "DRAFT" ? "text-destructive hover:text-destructive" : "text-muted-foreground cursor-not-allowed"}
+                          disabled={c.status !== "DRAFT"}
                           onClick={() => onDelete(c)}
                         >
                           <Trash2 className="size-4" />

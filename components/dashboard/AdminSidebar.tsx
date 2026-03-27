@@ -20,7 +20,8 @@ import {
 const navItems = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/dashboard/products", label: "Sản phẩm", icon: Package },
-  { href: "/dashboard/consignors", label: "Kho cung cấp", icon: Warehouse },
+  { href: "/dashboard/warehouses", label: "Quản lý kho", icon: Warehouse },
+  { href: "/dashboard/consignors", label: "Kho sản xuất", icon: Warehouse },
   { href: "/dashboard/stores", label: "Cửa hàng", icon: Store },
   { href: "/dashboard/consignments", label: "Ký gửi", icon: ArrowLeftRight },
   { href: "/dashboard/sales", label: "Bán hàng", icon: ShoppingCart },

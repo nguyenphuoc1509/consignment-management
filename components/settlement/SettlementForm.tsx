@@ -151,7 +151,7 @@ export function SettlementForm({
                       const data = salesByConsignment[c.id];
                       return (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.code} — {consignor?.companyName ?? consignor?.name ?? c.consignorId} ({store?.name ?? c.storeId})
+                          {c.code} — {consignor?.name ?? c.consignorId} ({store?.name ?? c.storeId})
                           {data ? ` (${data.count} GD)` : ""}
                         </SelectItem>
                       );

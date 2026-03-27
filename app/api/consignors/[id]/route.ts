@@ -8,7 +8,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const consignor = await prisma.consignor.findUnique({ where: { id } });
+  const consignor = await prisma.consignor.findUnique({
+    where: { id },
+    include: { warehouses: { select: { id: true } } },
+  });
   if (!consignor) return apiNotFound("Không tìm thấy đối tác");
   return apiSuccess(consignor);
 }
@@ -23,7 +26,6 @@ export async function PUT(
 
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) data.name = body.name;
-    if (body.companyName !== undefined) data.name = body.companyName;
     if (body.code !== undefined) data.code = body.code;
     if (body.contactPerson !== undefined) data.contactPerson = body.contactPerson;
     if (body.phone !== undefined) data.phone = body.phone;
@@ -32,7 +34,6 @@ export async function PUT(
     if (body.managerName !== undefined) data.managerName = body.managerName;
     if (body.managerPhone !== undefined) data.managerPhone = body.managerPhone;
     if (body.note !== undefined) data.note = body.note;
-    if (body.type !== undefined) data.type = body.type;
     if (body.status !== undefined) data.status = body.status;
 
     const consignor = await prisma.consignor.update({

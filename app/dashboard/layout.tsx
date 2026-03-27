@@ -8,7 +8,8 @@ import AdminHeader from "@/components/dashboard/AdminHeader";
 const pageTitles: Record<string, string> = {
   "/dashboard": "Tổng quan",
   "/dashboard/products": "Sản phẩm",
-  "/dashboard/consignors": "Bên giao hàng",
+  "/dashboard/warehouses": "Quản lý kho",
+  "/dashboard/consignors": "Kho Sản Xuất",
   "/dashboard/stores": "Cửa hàng",
   "/dashboard/consignments": "Ký gửi",
   "/dashboard/sales": "Bán hàng",

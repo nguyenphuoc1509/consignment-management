@@ -18,11 +18,24 @@ interface ConsignmentDeleteDialogProps {
   onConfirm: () => void;
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Nháp",
+  SHIPPED: "Đã gửi",
+  PARTIAL_SOLD: "Bán một phần",
+  COMPLETED: "Hoàn thành",
+  RETURNED: "Đã trả về",
+  SETTLED: "Đã đối soát",
+  CANCELLED: "Đã hủy",
+};
+
 export function ConsignmentDeleteDialog({
   target,
   onClose,
   onConfirm,
 }: ConsignmentDeleteDialogProps) {
+  const isDeletable = target?.status === "DRAFT";
+  const statusLabel = target?.status ? STATUS_LABEL[target.status] ?? target.status : "";
+
   return (
     <Dialog open={!!target} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -34,15 +47,22 @@ export function ConsignmentDeleteDialog({
           <DialogDescription>
             Bạn có chắc chắn muốn xóa lô ký gửi &ldquo;{target?.code}&rdquo;?
             Hành động này không thể hoàn tác.
+            {target && !isDeletable && (
+              <span className="mt-2 block font-medium text-destructive">
+                Chỉ có thể xóa lô ở trạng thái Nháp. Lô này đang ở trạng thái &ldquo;{statusLabel}&rdquo;.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose}>
-            Hủy
+            {isDeletable ? "Hủy" : "Đóng"}
           </Button>
-          <Button variant="destructive" onClick={onConfirm}>
-            Xóa lô ký gửi
-          </Button>
+          {isDeletable && (
+            <Button variant="destructive" onClick={onConfirm}>
+              Xóa lô ký gửi
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

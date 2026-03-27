@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   Consignment,
@@ -26,12 +33,15 @@ import {
 import { Consignor } from "@/types/consignor";
 import { Store } from "@/types/store";
 import { Product } from "@/types/product";
+import { Warehouse } from "@/types/warehouse";
+import { WarehouseInventoryWithProduct } from "@/types/warehouseInventory";
+import { useWarehouseInventory } from "@/hooks/useWarehouseInventory";
+import { api } from "@/lib/api/client";
 
 interface ConsignmentFormProps {
   consignment?: ConsignmentWithItems;
   consignors: Consignor[];
   stores: Store[];
-  products: Product[];
   onSubmit?: (
     data: Omit<Consignment, "id" | "createdAt" | "updatedAt">,
     items: Omit<ConsignmentItem, "id" | "consignmentId">[]
@@ -46,19 +56,19 @@ interface ConsignmentFormProps {
 type NewItem = Omit<ConsignmentItem, "id" | "consignmentId">;
 
 const STATUS_OPTIONS: { value: ConsignmentStatus; label: string }[] = [
-  { value: "PENDING", label: "Chờ gửi" },
-  { value: "SENT", label: "Đã gửi" },
+  { value: "DRAFT", label: "Nháp" },
+  { value: "SHIPPED", label: "Đã gửi" },
   { value: "PARTIAL_SOLD", label: "Bán một phần" },
   { value: "COMPLETED", label: "Hoàn thành" },
   { value: "RETURNED", label: "Đã trả về" },
   { value: "SETTLED", label: "Đã đối soát" },
+  { value: "CANCELLED", label: "Đã hủy" },
 ];
 
 export function ConsignmentForm({
   consignment,
   consignors,
   stores,
-  products,
   onSubmit,
   onSubmitEdit,
   isLoading = false,
@@ -69,21 +79,64 @@ export function ConsignmentForm({
   const [form, setForm] = useState({
     code: consignment?.code ?? "",
     consignorId: consignment?.consignorId ?? "",
+    warehouseId: consignment?.warehouseId ?? "",
     storeId: consignment?.storeId ?? "",
     sentDate: consignment?.sentDate ?? "",
     expectedReturnDate: consignment?.expectedReturnDate ?? "",
-    status: consignment?.status ?? "PENDING",
-    notes: consignment?.notes ?? "",
+    status: (consignment?.status ?? "SHIPPED") as ConsignmentStatus,
+    note: consignment?.note ?? "",
   });
 
+  const { inventory: warehouseInventory, fetchInventory, clearInventory } = useWarehouseInventory();
+
+  useEffect(() => {
+    if (form.consignorId !== (consignment?.consignorId ?? "")) {
+      setForm((f) => ({ ...f, warehouseId: "" }));
+      clearInventory();
+    }
+  }, [form.consignorId, consignment?.consignorId, clearInventory]);
+
+  useEffect(() => {
+    if (form.warehouseId) {
+      fetchInventory(form.warehouseId, true);
+    } else {
+      clearInventory();
+    }
+  }, [form.warehouseId, fetchInventory, clearInventory]);
+
+  useEffect(() => {
+    if (isEditing && consignment?.warehouseId) {
+      fetchInventory(consignment.warehouseId, false);
+    }
+  }, [isEditing, consignment?.warehouseId, fetchInventory]);
+
+  const [consignorWarehouses, setConsignorWarehouses] = useState<Warehouse[]>([]);
+  const [loadingWarehouses, setLoadingWarehouses] = useState(false);
+
+  // Khi consignor thay đổi, fetch danh sách kho của consignor đó
+  useEffect(() => {
+    if (form.consignorId) {
+      setLoadingWarehouses(true);
+      api.get<Warehouse[]>(`/api/warehouses?consignorId=${form.consignorId}`)
+        .then((data) => setConsignorWarehouses(data))
+        .catch(() => setConsignorWarehouses([]))
+        .finally(() => setLoadingWarehouses(false));
+    } else {
+      setConsignorWarehouses([]);
+    }
+  }, [form.consignorId]);
+
   const [items, setItems] = useState<NewItem[]>(
-    consignment?.items.map((i) => ({
+    (consignment?.items.map((i) => ({
       productId: i.productId,
       quantitySent: i.quantitySent,
       quantitySold: i.quantitySold,
       quantityReturned: i.quantityReturned,
       quantityDamaged: i.quantityDamaged,
-    })) ?? []
+      status: (i.status ?? "ACTIVE") as NewItem["status"],
+      createdAt: i.createdAt ?? new Date().toISOString(),
+      updatedAt: i.updatedAt ?? new Date().toISOString(),
+    })) ?? []) as NewItem[]
   );
 
   const [productSelect, setProductSelect] = useState("");
@@ -93,7 +146,8 @@ export function ConsignmentForm({
   function validate(): boolean {
     const next: Record<string, string> = {};
     if (!form.code.trim()) next.code = "Mã lô ký gửi là bắt buộc.";
-    if (!form.consignorId) next.consignorId = "Bên giao hàng là bắt buộc.";
+    if (!form.consignorId) next.consignorId = "Kho sản xuất là bắt buộc.";
+    if (!form.warehouseId) next.warehouseId = "Kho lấy hàng là bắt buộc.";
     if (!form.storeId) next.storeId = "Cửa hàng nhận hàng là bắt buộc.";
     if (!form.sentDate) next.sentDate = "Ngày gửi là bắt buộc.";
     if (items.length === 0) next.items = "Phải thêm ít nhất một sản phẩm.";
@@ -108,11 +162,12 @@ export function ConsignmentForm({
     const consignmentData = {
       code: form.code.trim(),
       consignorId: form.consignorId,
+      warehouseId: form.warehouseId,
       storeId: form.storeId,
       sentDate: form.sentDate,
       expectedReturnDate: form.expectedReturnDate || undefined,
       status: form.status,
-      notes: form.notes.trim() || undefined,
+      note: form.note.trim() || undefined,
     };
 
     if (isEditing && onSubmitEdit) {
@@ -131,10 +186,21 @@ export function ConsignmentForm({
 
   function addItem() {
     if (!productSelect) return;
+
+    const invItem = warehouseInventory.find((i) => i.productId === productSelect);
+    if (invItem && qtySent > invItem.quantity) {
+      setErrors((prev) => ({
+        ...prev,
+        items: `Số lượng vượt tồn kho (tối đa ${invItem.quantity}).`,
+      }));
+      return;
+    }
+
     if (items.some((i) => i.productId === productSelect)) {
       setErrors((prev) => ({ ...prev, items: "Sản phẩm đã có trong danh sách." }));
       return;
     }
+
     setItems((prev) => [
       ...prev,
       {
@@ -143,6 +209,9 @@ export function ConsignmentForm({
         quantitySold: 0,
         quantityReturned: 0,
         quantityDamaged: 0,
+        status: "ACTIVE" as NewItem["status"],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       },
     ]);
     setProductSelect("");
@@ -167,14 +236,18 @@ export function ConsignmentForm({
   }
 
   function getProductName(id: string) {
-    return products.find((p) => p.id === id)?.name ?? id;
+    const inv = warehouseInventory.find((i) => i.productId === id);
+    return inv?.product.name ?? id;
   }
 
   function getProductPrice(id: string) {
-    return products.find((p) => p.id === id)?.price ?? 0;
+    const inv = warehouseInventory.find((i) => i.productId === id);
+    return inv?.product.price ?? 0;
   }
 
-  const activeProducts = products;
+  function getAvailableQty(productId: string) {
+    return warehouseInventory.find((i) => i.productId === productId)?.quantity ?? null;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -187,7 +260,7 @@ export function ConsignmentForm({
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="consignorId" className="text-sm font-medium">
-              Bên giao hàng <span className="text-destructive">*</span>
+              Kho sản xuất <span className="text-destructive">*</span>
             </Label>
             <Select
               value={form.consignorId}
@@ -199,19 +272,19 @@ export function ConsignmentForm({
                 id="consignorId"
                 className={cn(errors.consignorId && "border-destructive")}
               >
-                <SelectValue placeholder="Chọn bên giao hàng" />
+                <SelectValue placeholder="Chọn kho sản xuất..." />
               </SelectTrigger>
               <SelectContent>
-                {consignors.length === 0 ? (
+                {consignors.filter((c) => c.status === "ACTIVE").length === 0 ? (
                   <div className="px-3 py-2 text-sm text-muted-foreground">
-                    Chưa có bên giao hàng.
+                    Chưa có kho sản xuất nào. Tạo kho trước.
                   </div>
                 ) : (
                   consignors
                     .filter((c) => c.status === "ACTIVE")
                     .map((c) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {c.companyName}
+                        {c.name}
                       </SelectItem>
                     ))
                 )}
@@ -222,6 +295,55 @@ export function ConsignmentForm({
             )}
           </div>
 
+          {/* Chọn kho — hiện khi đã chọn consignor */}
+          {form.consignorId && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="warehouseId" className="text-sm font-medium">
+                Kho lấy hàng <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={form.warehouseId}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, warehouseId: v }))
+                }
+                disabled={!form.consignorId || loadingWarehouses}
+              >
+                <SelectTrigger
+                  id="warehouseId"
+                  className={cn(errors.warehouseId && "border-destructive")}
+                >
+                  <SelectValue
+                    placeholder={
+                      loadingWarehouses
+                        ? "Đang tải kho..."
+                        : "Chọn kho lấy hàng"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {consignorWarehouses.length === 0 && !loadingWarehouses ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      Kho này chưa có kho dự trữ nào. Tạo kho dự trữ trước.
+                    </div>
+                  ) : (
+                    consignorWarehouses
+                      .filter((w) => w.status === "ACTIVE")
+                      .map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name} — {w.code}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.warehouseId && (
+                <p className="text-xs text-destructive">{errors.warehouseId}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="storeId" className="text-sm font-medium">
               Cửa hàng nhận <span className="text-destructive">*</span>
@@ -305,35 +427,44 @@ export function ConsignmentForm({
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-sm font-medium">Trạng thái</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, status: v as ConsignmentStatus }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isEditing ? (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm font-medium">Trạng thái</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, status: v as ConsignmentStatus }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm font-medium">Trạng thái</Label>
+              <div className="flex items-center h-10 px-3 rounded-md border border-border bg-muted/30 text-sm text-muted-foreground">
+                Đã gửi (mặc định khi tạo mới)
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="notes" className="text-sm font-medium">Ghi chú</Label>
+          <Label htmlFor="note" className="text-sm font-medium">Ghi chú</Label>
           <Textarea
-            id="notes"
-            value={form.notes}
+            id="note"
+            value={form.note}
             onChange={(e) =>
-              setForm((f) => ({ ...f, notes: e.target.value }))
+              setForm((f) => ({ ...f, note: e.target.value }))
             }
             placeholder="Nhập ghi chú nếu có..."
             rows={2}
@@ -351,33 +482,57 @@ export function ConsignmentForm({
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5 flex-1">
             <Label className="text-sm font-medium">Sản phẩm</Label>
-            <Select value={productSelect} onValueChange={setProductSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Chọn sản phẩm..." />
-              </SelectTrigger>
-              <SelectContent>
-                  {activeProducts.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      Chưa có sản phẩm nào.
-                    </div>
-                ) : (
-                  activeProducts.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} — {formatCurrency(p.price)}
+            {!form.warehouseId ? (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                <AlertCircle className="size-3" />
+                Chọn kho trước để hiện sản phẩm.
+              </div>
+            ) : warehouseInventory.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                <AlertCircle className="size-3" />
+                Kho này chưa có sản phẩm nào trong kho.
+              </div>
+            ) : (
+              <Select value={productSelect} onValueChange={setProductSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn sản phẩm..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouseInventory.map((item) => (
+                    <SelectItem key={item.productId} value={item.productId}>
+                      {item.product.name} — Tồn: {item.quantity} — {formatCurrency(item.product.price)}
                     </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="flex flex-col gap-1.5 sm:w-32">
             <Label className="text-sm font-medium">SL gửi</Label>
-            <Input
-              type="number"
-              min={1}
-              value={qtySent}
-              onChange={(e) => setQtySent(Number(e.target.value))}
-            />
+            {productSelect ? (
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={1}
+                  max={getAvailableQty(productSelect) ?? undefined}
+                  value={qtySent}
+                  onChange={(e) => setQtySent(Number(e.target.value))}
+                  className="pr-12"
+                />
+                {getAvailableQty(productSelect) !== null && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    /{getAvailableQty(productSelect)}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <Input
+                type="number"
+                min={1}
+                value={qtySent}
+                onChange={(e) => setQtySent(Number(e.target.value))}
+              />
+            )}
           </div>
           <Button type="button" variant="outline" size="sm" onClick={addItem}>
             <Plus className="size-4" />
@@ -442,37 +597,13 @@ export function ConsignmentForm({
                     {isEditing && (
                       <>
                         <TableCell className="text-center">
-                          <Input
-                            type="number"
-                            min={0}
-                            className="w-20 mx-auto text-center"
-                            value={item.quantitySold}
-                            onChange={(e) =>
-                              updateItemQty(item.productId, "quantitySold", Number(e.target.value))
-                            }
-                          />
+                          <Badge variant="secondary">{item.quantitySold}</Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Input
-                            type="number"
-                            min={0}
-                            className="w-20 mx-auto text-center"
-                            value={item.quantityReturned}
-                            onChange={(e) =>
-                              updateItemQty(item.productId, "quantityReturned", Number(e.target.value))
-                            }
-                          />
+                          <Badge variant="secondary">{item.quantityReturned}</Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Input
-                            type="number"
-                            min={0}
-                            className="w-20 mx-auto text-center"
-                            value={item.quantityDamaged}
-                            onChange={(e) =>
-                              updateItemQty(item.productId, "quantityDamaged", Number(e.target.value))
-                            }
-                          />
+                          <Badge variant="secondary">{item.quantityDamaged}</Badge>
                         </TableCell>
                       </>
                     )}

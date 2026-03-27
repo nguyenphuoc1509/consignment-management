@@ -1,7 +1,7 @@
 // app/api/consignors/route.ts
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { apiSuccess, apiCreated, apiError, apiNoContent } from "@/lib/api/helpers";
+import { apiSuccess, apiCreated, apiError } from "@/lib/api/helpers";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -31,24 +31,26 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const data = {
-      // Map from old field name used by the form
-      name: body.companyName ?? body.name,
-      code: body.code,
-      contactPerson: body.contactPerson,
-      phone: body.phone,
-      email: body.email,
-      address: body.address,
-      type: body.type ?? "EXTERNAL",
-      managerName: body.managerName,
-      managerPhone: body.managerPhone,
-      note: body.note,
-      status: body.status ?? "ACTIVE",
-    };
+    if (!body.name?.trim()) return apiError("Tên kho sản xuất là bắt buộc.", 400);
+    if (!body.code?.trim()) return apiError("Mã kho là bắt buộc.", 400);
 
-    const consignor = await prisma.consignor.create({ data });
+    const consignor = await prisma.consignor.create({
+      data: {
+        name: body.name.trim(),
+        code: body.code.trim(),
+        contactPerson: body.contactPerson?.trim() || undefined,
+        phone: body.phone?.trim() || undefined,
+        email: body.email?.trim() || undefined,
+        address: body.address?.trim() || undefined,
+        managerName: body.managerName?.trim() || undefined,
+        managerPhone: body.managerPhone?.trim() || undefined,
+        note: body.note?.trim() || undefined,
+        status: body.status ?? "ACTIVE",
+      },
+    });
+
     return apiCreated(consignor);
   } catch (err) {
-    return apiError(err instanceof Error ? err.message : "Lỗi khi tạo đối tác");
+    return apiError(err instanceof Error ? err.message : "Lỗi khi tạo kho sản xuất");
   }
 }

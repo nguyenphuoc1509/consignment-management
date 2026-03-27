@@ -14,7 +14,7 @@ import {
 
 export default function AddConsignmentPage() {
   const router = useRouter();
-  const { addConsignment, consignors, stores, products } = useConsignments();
+  const { addConsignment, consignors, stores } = useConsignments();
 
   function handleSubmit(
     data: Omit<Consignment, "id" | "createdAt" | "updatedAt">,
@@ -50,7 +50,6 @@ export default function AddConsignmentPage() {
         <ConsignmentForm
           consignors={consignors}
           stores={stores}
-          products={products}
           onSubmit={handleSubmit}
         />
       </div>

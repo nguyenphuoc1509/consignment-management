@@ -15,6 +15,4 @@ export type Consignor = {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;
-  /** Form alias — maps to `name` when sent to API */
-  companyName?: string;
 };

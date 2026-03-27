@@ -1,7 +1,7 @@
 // app/api/consignments/route.ts
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { apiSuccess, apiCreated, apiError, apiNotFound } from "@/lib/api/helpers";
+import { apiSuccess, apiCreated, apiError } from "@/lib/api/helpers";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     include: {
       consignor: { select: { name: true } },
       store: { select: { name: true } },
+      warehouse: { select: { id: true, name: true, code: true } },
       consignmentItems: true,
     },
     orderBy: { createdAt: "desc" },
@@ -37,29 +38,60 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { items, ...consignmentData } = body;
+    const { items, warehouseId, ...consignmentData } = body;
 
-    const consignment = await prisma.consignment.create({
-      data: {
-        ...consignmentData,
-        sentDate: new Date(consignmentData.sentDate),
-        expectedReturnDate: consignmentData.expectedReturnDate
-          ? new Date(consignmentData.expectedReturnDate)
-          : undefined,
-        ...(items?.length > 0 && {
-          consignmentItems: {
-            create: items.map((item: { productId: string; quantitySent: number }) => ({
+    const isShipped = consignmentData.status === "SHIPPED";
+
+    const consignment = await prisma.$transaction(async (tx) => {
+      const created = await tx.consignment.create({
+        data: {
+          ...consignmentData,
+          warehouseId: warehouseId || null,
+          sentDate: new Date(consignmentData.sentDate),
+          ...(consignmentData.expectedReturnDate && {
+            expectedReturnDate: new Date(consignmentData.expectedReturnDate),
+          }),
+          ...(items?.length > 0 && {
+            consignmentItems: {
+              create: items.map((item: { productId: string; quantitySent: number }) => ({
+                productId: item.productId,
+                quantitySent: item.quantitySent,
+              })),
+            },
+          }),
+        },
+        include: {
+          consignor: { select: { name: true } },
+          store: { select: { name: true } },
+          warehouse: { select: { name: true } },
+          consignmentItems: true,
+        },
+      });
+
+      // Trừ tồn kho khi trạng thái là Đã gửi
+      if (isShipped && warehouseId && items?.length > 0) {
+        for (const item of items) {
+          await tx.warehouseInventory.upsert({
+            where: {
+              warehouseId_productId: {
+                warehouseId,
+                productId: item.productId,
+              },
+            },
+            create: {
+              warehouseId,
               productId: item.productId,
-              quantitySent: item.quantitySent,
-            })),
-          },
-        }),
-      },
-      include: {
-        consignor: { select: { name: true } },
-        store: { select: { name: true } },
-        consignmentItems: true,
-      },
+              quantity: 0,
+              reserved: 0,
+            },
+            update: {
+              quantity: { decrement: item.quantitySent },
+            },
+          });
+        }
+      }
+
+      return created;
     });
 
     return apiCreated(consignment);

@@ -24,7 +24,7 @@ export function ConsignorForm({
   const isEditing = !!consignor;
 
   const [form, setForm] = useState({
-    companyName: consignor?.name ?? "",
+    name: consignor?.name ?? "",
     code: consignor?.code ?? "",
     contactPerson: consignor?.contactPerson ?? "",
     phone: consignor?.phone ?? "",
@@ -37,8 +37,7 @@ export function ConsignorForm({
 
   function validate(): boolean {
     const next: Record<string, string> = {};
-    if (!form.companyName.trim())
-      next.companyName = "Tên kho cung cấp là bắt buộc.";
+    if (!form.name.trim()) next.name = "Tên kho sản xuất là bắt buộc.";
     if (!form.code.trim()) next.code = "Mã là bắt buộc.";
     if (!form.contactPerson.trim())
       next.contactPerson = "Người quản lý là bắt buộc.";
@@ -57,7 +56,7 @@ export function ConsignorForm({
     if (!validate()) return;
 
     const payload: Partial<Consignor> = {
-      companyName: form.companyName.trim(),
+      name: form.name.trim(),
       code: form.code.trim(),
       contactPerson: form.contactPerson.trim(),
       phone: form.phone.trim(),
@@ -105,29 +104,30 @@ export function ConsignorForm({
       {/* Row 1 */}
       <div className="grid gap-5 sm:grid-cols-2">
         {field(
-          "companyName",
-          "Tên kho cung cấp",
+          "name",
+          "Tên kho sản xuất",
           <Input
-            id="companyName"
-            value={form.companyName}
+            id="name"
+            value={form.name}
             onChange={(e) =>
-              setForm((f) => ({ ...f, companyName: e.target.value }))
+              setForm((f) => ({ ...f, name: e.target.value }))
             }
-            placeholder="Ví dụ: Công ty TNHH Thời Trang My"
-            className={cn(errors.companyName && "border-destructive")}
+            placeholder="Ví dụ: Kho Sản Xuất My Fashion"
+            className={cn(errors.name && "border-destructive")}
           />
         )}
         {field(
           "code",
-          "Mã kho cung cấp",
+          "Mã kho",
           <Input
             id="code"
             value={form.code}
             onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-            placeholder="Ví dụ: MY-FASHION"
+            placeholder="Ví dụ: KHO-001"
+            disabled={isEditing}
             className={cn(errors.code && "border-destructive")}
           />,
-          "Mã duy nhất dùng để nhận diện kho cung cấp."
+          "Mã duy nhất dùng để nhận diện kho sản xuất."
         )}
       </div>
 
@@ -135,7 +135,7 @@ export function ConsignorForm({
       <div className="grid gap-5 sm:grid-cols-2">
         {field(
           "contactPerson",
-          "Người liên hệ",
+          "Người quản lý",
           <Input
             id="contactPerson"
             value={form.contactPerson}
@@ -148,7 +148,7 @@ export function ConsignorForm({
         )}
         {field(
           "phone",
-          "Số điện thoại",
+          "Điện thoại",
           <Input
             id="phone"
             type="tel"
@@ -213,7 +213,7 @@ export function ConsignorForm({
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Bên giao hàng tạm ngưng sẽ không hiển thị khi tạo ký gửi.
+            Kho bị tạm ngưng sẽ không hiển thị khi tạo ký gửi.
           </p>
         </div>
       </div>
@@ -243,11 +243,7 @@ export function ConsignorForm({
           Hủy
         </Button>
         <Button type="submit" disabled={isLoading}>
-          {isLoading
-            ? "Đang lưu..."
-            : isEditing
-            ? "Lưu thay đổi"
-            : "Tạo bên giao hàng"}
+          {isLoading ? "Đang lưu..." : isEditing ? "Lưu thay đổi" : "Tạo kho sản xuất"}
         </Button>
       </div>
     </form>

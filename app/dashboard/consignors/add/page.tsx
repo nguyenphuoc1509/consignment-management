@@ -29,10 +29,10 @@ export default function AddConsignorPage() {
           </Button>
           <div className="flex flex-col gap-0.5">
             <h2 className="text-lg font-bold text-foreground sm:text-xl">
-              Thêm bên giao hàng
+              Thêm kho sản xuất
             </h2>
             <p className="text-xs text-muted-foreground sm:text-sm">
-              Nhập thông tin bên giao hàng mới.
+              Tạo kho sản xuất để cung cấp hàng cho các kho dự trữ.
             </p>
           </div>
         </div>

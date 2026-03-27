@@ -14,7 +14,6 @@ import {
 export interface DeletableItem {
   id: string;
   name?: string;
-  companyName?: string;
   code?: string;
 }
 
@@ -42,7 +41,7 @@ export function DeleteDialog<T extends DeletableItem>({
           <DialogDescription className="text-md">
             Bạn có chắc chắn muốn xóa &ldquo;
             <strong className="text-foreground">
-              {target?.name ?? target?.companyName}
+              {target?.name}
             </strong>
             &rdquo;? Hành động này không thể hoàn tác.
           </DialogDescription>

@@ -85,7 +85,7 @@ export function SettlementFilters({
             <SelectItem value="all">Tất cả bên giao</SelectItem>
             {consignors.map((cg) => (
               <SelectItem key={cg.id} value={cg.id}>
-                {cg.companyName}
+                {cg.name}
               </SelectItem>
             ))}
           </SelectContent>
