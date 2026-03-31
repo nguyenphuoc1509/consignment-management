@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { useSales } from "@/hooks/useSales";
 
 export default function AddSalePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const storeIdFromQuery = searchParams.get("storeId");
   const {
     addSale,
     stores,
@@ -23,7 +25,11 @@ export default function AddSalePage() {
       alert("Không thể tạo giao dịch. Vui lòng kiểm tra lại thông tin.");
       return;
     }
-    router.push("/dashboard/sales");
+    if (storeIdFromQuery && data.storeId === storeIdFromQuery) {
+      router.push(`/dashboard/sales/by-store/${storeIdFromQuery}`);
+    } else {
+      router.push("/dashboard/sales");
+    }
   }
 
   return (
@@ -55,6 +61,7 @@ export default function AddSalePage() {
           products={products}
           getAvailableQuantity={getAvailableQuantity}
           onSubmit={handleSubmit}
+          defaultStoreId={storeIdFromQuery ?? undefined}
         />
       </div>
     </div>

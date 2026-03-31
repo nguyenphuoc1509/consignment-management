@@ -1,7 +1,13 @@
-// SaleStatus uses COMPLETED/CANCELLED to match Prisma's CONFIRMED/CANCELLED.
-// Conversion: Prisma CONFIRMED = API COMPLETED (same concept, different naming)
-// API layer handles the Prisma enum internally.
-export type SaleStatus = "COMPLETED" | "CANCELLED";
+export type SaleStatus = "COMPLETED" | "CANCELLED" | "CONFIRMED" | "DRAFT";
+
+export function saleCountsTowardRevenue(status: string): boolean {
+  return status === "CONFIRMED" || status === "COMPLETED";
+}
+
+export function saleDisplayCode(sale: { code?: string | null; id: string }): string {
+  const c = sale.code?.trim();
+  return c && c.length > 0 ? c : sale.id;
+}
 
 export type Sale = {
   id: string;

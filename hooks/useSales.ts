@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { api } from "@/lib/api/client";
-import { Sale, SaleStatus, SaleWithDetails } from "@/types/sale";
-import { Consignment, ConsignmentItem } from "@/types/consignment";
+import { Sale, SaleStatus, SaleWithDetails, saleCountsTowardRevenue } from "@/types/sale";
+import { Consignment, ConsignmentItem, ConsignmentWithItems } from "@/types/consignment";
 import { Store } from "@/types/store";
 import { Product } from "@/types/product";
 import { Consignor } from "@/types/consignor";
@@ -39,7 +39,6 @@ export function useSales() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [storeFilter, setStoreFilter] = useState("all");
-  const [consignmentFilter, setConsignmentFilter] = useState("all");
 
   const debouncedSearch = useDebounce(search);
 
@@ -98,7 +97,6 @@ export function useSales() {
           const items = await api.get<EnrichedConsignmentItem[]>(`/api/consignments/${consignment.id}/items`);
           itemsMap.push(...items);
         } catch {
-          // Skip if fails
         }
       }
       setConsignmentItems(itemsMap);
@@ -147,6 +145,15 @@ export function useSales() {
     });
   }, [sales, consignments, consignors, products, stores]);
 
+  const consignmentsWithItems = useMemo((): ConsignmentWithItems[] => {
+    return consignments.map((c) => ({
+      ...c,
+      items: consignmentItems
+        .filter((i) => i.consignmentId === c.id)
+        .map(({ consignmentId: _cid, productName: _pn, productSku: _ps, ...rest }) => rest as ConsignmentItem),
+    }));
+  }, [consignments, consignmentItems]);
+
   const filtered = useMemo(() => {
     return enriched.filter((s) => {
       const q = debouncedSearch.toLowerCase();
@@ -159,30 +166,34 @@ export function useSales() {
         s.storeName.toLowerCase().includes(q) ||
         s.consignorName.toLowerCase().includes(q);
       const matchStatus =
-        statusFilter === "all" || s.status === statusFilter;
+        statusFilter === "all" ||
+        (statusFilter === "COMPLETED"
+          ? saleCountsTowardRevenue(s.status)
+          : s.status === statusFilter);
       const matchStore =
         storeFilter === "all" || s.storeId === storeFilter;
-      const matchConsignment =
-        consignmentFilter === "all" || s.consignmentId === consignmentFilter;
-      return matchSearch && matchStatus && matchStore && matchConsignment;
+      return matchSearch && matchStatus && matchStore;
     });
-  }, [enriched, debouncedSearch, statusFilter, storeFilter, consignmentFilter]);
+  }, [enriched, debouncedSearch, statusFilter, storeFilter]);
 
   const total = sales.length;
   const totalRevenue = useMemo(
     () =>
       sales
-        .filter((s) => s.status === "COMPLETED")
-        .reduce((sum, s) => sum + s.quantity * s.soldPrice, 0),
+        .filter((s) => saleCountsTowardRevenue(s.status))
+        .reduce((sum, s) => sum + s.quantity * Number(s.soldPrice), 0),
     [sales]
   );
   const byStatus = useMemo(() => {
     const counts: Record<SaleStatus, number> = {
       COMPLETED: 0,
+      CONFIRMED: 0,
       CANCELLED: 0,
+      DRAFT: 0,
     };
     for (const s of sales) {
-      counts[s.status]++;
+      const k = s.status as SaleStatus;
+      if (k in counts) counts[k]++;
     }
     return counts;
   }, [sales]);
@@ -297,7 +308,7 @@ export function useSales() {
         (s) =>
           s.consignmentId === consignmentId &&
           s.productId === productId &&
-          s.status === "COMPLETED"
+          saleCountsTowardRevenue(s.status)
       )
       .reduce((sum, s) => sum + s.quantity, 0);
     return Math.max(0, item.quantitySent - soldFromStore - item.quantityReturned - item.quantityDamaged);
@@ -310,11 +321,9 @@ export function useSales() {
       search,
       statusFilter,
       storeFilter,
-      consignmentFilter,
       setSearch,
       setStatusFilter,
       setStoreFilter,
-      setConsignmentFilter,
     },
     counts: { total, byStatus, totalRevenue },
     deleteSale,
@@ -323,7 +332,7 @@ export function useSales() {
     getSale,
     getAvailableQuantity,
     stores,
-    consignments,
+    consignments: consignmentsWithItems,
     products,
     consignors,
     loading,

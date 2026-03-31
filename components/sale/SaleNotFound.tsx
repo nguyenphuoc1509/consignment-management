@@ -23,7 +23,7 @@ export function SaleNotFound({ id }: SaleNotFoundProps) {
         </p>
       </div>
       <Button variant="outline" size="sm" asChild>
-        <Link href="/dashboard/sales">Quay lại danh sách</Link>
+        <Link href="/dashboard/sales/transactions">Quay lại danh sách giao dịch</Link>
       </Button>
     </div>
   );

@@ -2,10 +2,36 @@
 import prisma from "@/lib/prisma";
 import { ConsignmentService } from "./consignmentService";
 
-function generateSaleCode(): string {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-  return `SALE-${timestamp}-${random}`;
+function datePartForCode(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}${m}${day}`;
+}
+
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+async function allocateSaleCode(tx: Tx, soldAt: Date): Promise<string> {
+  const prefix = `GD-${datePartForCode(soldAt)}-`;
+  const latest = await tx.sale.findFirst({
+    where: { code: { startsWith: prefix } },
+    orderBy: { code: "desc" },
+    select: { code: true },
+  });
+
+  let seq = 1;
+  if (latest?.code?.startsWith(prefix)) {
+    const n = parseInt(latest.code.slice(prefix.length), 10);
+    if (!Number.isNaN(n)) seq = n + 1;
+  }
+
+  for (let bump = 0; bump < 8; bump++) {
+    const code = `${prefix}${String(seq + bump).padStart(4, "0")}`;
+    const clash = await tx.sale.findUnique({ where: { code }, select: { id: true } });
+    if (!clash) return code;
+  }
+
+  return `${prefix}${Date.now().toString(36).toUpperCase().slice(-6)}`;
 }
 
 export interface CreateSaleInput {
@@ -48,21 +74,20 @@ export class SaleService {
         throw new Error("Số lượng bán phải lớn hơn 0");
       }
 
-      // TODO: kiểm tra hàng tồn kho trước khi bán
       const warnings: string[] = [];
 
-      // Cập nhật quantitySold trong ConsignmentItem
       await tx.consignmentItem.update({
         where: { id: item.id },
         data: { quantitySold: { increment: quantity } },
       });
 
+      const at = soldAt ? new Date(soldAt) : new Date();
       const sale = await tx.sale.create({
         data: {
-          code: generateSaleCode(),
+          code: await allocateSaleCode(tx, at),
           quantity,
           soldPrice: soldPrice.toString(),
-          soldAt: soldAt ? new Date(soldAt) : new Date(),
+          soldAt: at,
           note,
           status: "CONFIRMED",
           consignmentId,
@@ -92,7 +117,6 @@ export class SaleService {
         throw new Error("Sale này đã được hoàn tiền");
       }
 
-      // TODO: kiểm tra và cập nhật hàng tồn kho khi hoàn tiền
       await tx.consignmentItem.update({
         where: { id: sale.consignmentItemId },
         data: { quantitySold: { decrement: sale.quantity } },

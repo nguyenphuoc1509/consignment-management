@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
           { code: { contains: search, mode: "insensitive" } },
           { consignment: { code: { contains: search, mode: "insensitive" } } },
           { consignment: { consignor: { name: { contains: search, mode: "insensitive" } } } },
-          { consignment: { store: { name: { contains: search, mode: "insensitive" } } },
+          { consignment: { store: { name: { contains: search, mode: "insensitive" } } } },
         ],
       }),
       ...(statusFilter && { status: statusFilter as never }),

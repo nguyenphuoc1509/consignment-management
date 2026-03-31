@@ -1,6 +1,7 @@
 export { SaleSummaryCards } from "./SaleSummaryCards";
 export { SaleFilters } from "./SaleFilters";
 export { SaleTable } from "./SaleTable";
+export { StoreSalesTable } from "./StoreSalesTable";
 export { SaleForm } from "./SaleForm";
 export { SaleDetailView } from "./SaleDetailView";
 export { SaleDetailHeader } from "./SaleDetailHeader";

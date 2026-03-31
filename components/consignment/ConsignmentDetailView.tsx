@@ -226,7 +226,7 @@ export function ConsignmentDetailView({
                   item.quantityReturned -
                   item.quantityDamaged;
                 return (
-                  <TableRow key={item.id}>
+                  <TableRow key={`${consignment.id}-${item.id}`}>
                     <TableCell className="text-xs text-muted-foreground">
                       {idx + 1}
                     </TableCell>

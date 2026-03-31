@@ -40,7 +40,7 @@ export default function SaleDetailPage({
   function handleDelete() {
     if (!deleteTarget) return;
     deleteSale(deleteTarget.id);
-    router.push("/dashboard/sales");
+    router.push("/dashboard/sales/transactions");
   }
 
   function handleCancel() {

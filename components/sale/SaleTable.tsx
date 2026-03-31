@@ -12,12 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { SaleWithDetails, SaleStatus } from "@/types/sale";
+import { SaleWithDetails, SaleStatus, saleCountsTowardRevenue, saleDisplayCode } from "@/types/sale";
 import { formatCurrency } from "@/lib/utils";
 
-const STATUS_CONFIG: Record<SaleStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
   COMPLETED: { label: "Hoàn thành", variant: "default" },
+  CONFIRMED: { label: "Đã xác nhận", variant: "default" },
   CANCELLED: { label: "Đã hủy", variant: "secondary" },
+  DRAFT: { label: "Nháp", variant: "secondary" },
 };
 
 interface SaleTableProps {
@@ -35,7 +37,7 @@ function SaleCard({
   onDelete: () => void;
   onCancel: () => void;
 }) {
-  const statusCfg = STATUS_CONFIG[sale.status];
+  const statusCfg = STATUS_CONFIG[sale.status] ?? { label: sale.status, variant: "secondary" as const };
   const grossAmount = sale.quantity * sale.soldPrice;
 
   return (
@@ -43,7 +45,7 @@ function SaleCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="font-mono text-xs font-semibold text-foreground">
-            {sale.id}
+            {saleDisplayCode(sale)}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {sale.productName}
@@ -80,7 +82,7 @@ function SaleCard({
             <Eye className="size-3" />
           </Link>
         </Button>
-        {sale.status === "COMPLETED" && (
+        {saleCountsTowardRevenue(sale.status) && (
           <Button
             variant="ghost"
             size="icon-xs"
@@ -138,11 +140,11 @@ export function SaleTable({ sales, onDelete, onCancel }: SaleTableProps) {
             ) : (
               sales.map((s) => {
                 const grossAmount = s.quantity * s.soldPrice;
-                const statusCfg = STATUS_CONFIG[s.status];
+                const statusCfg = STATUS_CONFIG[s.status] ?? { label: s.status, variant: "secondary" as const };
                 return (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs font-medium text-foreground">
-                      {s.id}
+                      {saleDisplayCode(s)}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {s.consignmentCode}
@@ -182,7 +184,7 @@ export function SaleTable({ sales, onDelete, onCancel }: SaleTableProps) {
                             <Eye className="size-4" />
                           </Link>
                         </Button>
-                        {s.status === "COMPLETED" && (
+                        {saleCountsTowardRevenue(s.status) && (
                           <Button
                             variant="ghost"
                             size="icon-sm"

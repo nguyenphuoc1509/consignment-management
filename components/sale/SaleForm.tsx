@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Sale, SaleStatus } from "@/types/sale";
+import { Sale, SaleStatus, saleCountsTowardRevenue } from "@/types/sale";
 import { ConsignmentWithItems, ConsignmentItem } from "@/types/consignment";
 import { Store } from "@/types/store";
 import { Product } from "@/types/product";
@@ -28,6 +28,8 @@ interface SaleFormProps {
   getAvailableQuantity: (consignmentId: string, productId: string) => number;
   onSubmit?: (data: Omit<Sale, "id" | "createdAt" | "updatedAt">) => void;
   isLoading?: boolean;
+  /** Prefill cửa hàng (ví dụ từ `?storeId=` trên URL). */
+  defaultStoreId?: string;
 }
 
 export function SaleForm({
@@ -38,23 +40,31 @@ export function SaleForm({
   getAvailableQuantity,
   onSubmit,
   isLoading = false,
+  defaultStoreId,
 }: SaleFormProps) {
   const router = useRouter();
   const isEditing = !!sale;
 
   const [form, setForm] = useState({
     consignmentId: sale?.consignmentId ?? "",
+    consignmentItemId: sale?.consignmentItemId ?? "",
     productId: sale?.productId ?? "",
     storeId: sale?.storeId ?? "",
     quantity: sale?.quantity ?? 1,
     soldPrice: sale?.soldPrice ?? 0,
     soldAt: sale?.soldAt ? sale.soldAt.slice(0, 16) : "",
-    status: sale?.status ?? "COMPLETED" as SaleStatus,
-    notes: sale?.notes ?? "",
+    status: sale?.status ?? ("CONFIRMED" as SaleStatus),
+    note: sale?.note ?? "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [availQty, setAvailQty] = useState(0);
+
+  useEffect(() => {
+    if (defaultStoreId && stores.some((s) => s.id === defaultStoreId)) {
+      setForm((f) => ({ ...f, storeId: defaultStoreId }));
+    }
+  }, [defaultStoreId, stores]);
 
   // Auto-fill sold price when product is selected
   useEffect(() => {
@@ -73,9 +83,10 @@ export function SaleForm({
     .find((c) => c.id === form.consignmentId)
     ?.items ?? [];
 
-  // Filter consignments: only active ones sent to a store
+  // Filter consignments: only active ones sent to a store (optional theo cửa hàng từ URL)
   const activeConsignments = consignments.filter((c) =>
-    ["SHIPPED", "PARTIAL_SOLD"].includes(c.status)
+    ["SHIPPED", "PARTIAL_SOLD"].includes(c.status) &&
+    (!defaultStoreId || c.storeId === defaultStoreId)
   );
 
   function validate(): boolean {
@@ -96,14 +107,16 @@ export function SaleForm({
     if (!validate()) return;
 
     const payload: Omit<Sale, "id" | "createdAt" | "updatedAt"> = {
+      code: sale?.code ?? "",
       consignmentId: form.consignmentId,
+      consignmentItemId: form.consignmentItemId,
       productId: form.productId,
       storeId: form.storeId,
       quantity: form.quantity,
       soldPrice: form.soldPrice,
       soldAt: new Date(form.soldAt).toISOString(),
       status: form.status,
-      notes: form.notes.trim() || undefined,
+      note: form.note.trim() || undefined,
     };
 
     if (onSubmit) {
@@ -135,9 +148,15 @@ export function SaleForm({
             </Label>
             <Select
               value={form.consignmentId}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, consignmentId: v, productId: "" }))
-              }
+              onValueChange={(v) => {
+                const c = consignments.find((x) => x.id === v);
+                setForm((f) => ({
+                  ...f,
+                  consignmentId: v,
+                  productId: "",
+                  storeId: c?.storeId ?? f.storeId,
+                }));
+              }}
             >
               <SelectTrigger
                 id="consignmentId"
@@ -338,19 +357,19 @@ export function SaleForm({
                 <span
                   className={cn(
                     "text-sm",
-                    form.status === "COMPLETED"
+                    saleCountsTowardRevenue(form.status)
                       ? "text-foreground font-medium"
                       : "text-muted-foreground"
                   )}
                 >
-                  Hoàn thành
+                  Đã ghi nhận
                 </span>
                 <Switch
                   checked={form.status === "CANCELLED"}
                   onCheckedChange={(checked) =>
                     setForm((f) => ({
                       ...f,
-                      status: checked ? "CANCELLED" : "COMPLETED",
+                      status: checked ? "CANCELLED" : ("CONFIRMED" as SaleStatus),
                     }))
                   }
                 />
@@ -373,9 +392,9 @@ export function SaleForm({
               <Label htmlFor="notes" className="text-sm font-medium">Ghi chú</Label>
               <Textarea
                 id="notes"
-                value={form.notes}
+                value={form.note}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, notes: e.target.value }))
+                  setForm((f) => ({ ...f, note: e.target.value }))
                 }
                 placeholder="Nhập ghi chú nếu có (khuyến mãi, hoàn tiền...)"
                 rows={2}

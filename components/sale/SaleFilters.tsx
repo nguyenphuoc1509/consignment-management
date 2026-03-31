@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Consignment } from "@/types/consignment";
 import { Store } from "@/types/store";
 
 const STATUS_OPTIONS = [
@@ -22,26 +21,20 @@ interface SaleFiltersProps {
   search: string;
   statusFilter: string;
   storeFilter: string;
-  consignmentFilter: string;
   stores: Store[];
-  consignments: Consignment[];
   onSearchChange: (v: string) => void;
   onStatusChange: (v: string) => void;
   onStoreChange: (v: string) => void;
-  onConsignmentChange: (v: string) => void;
 }
 
 export function SaleFilters({
   search,
   statusFilter,
   storeFilter,
-  consignmentFilter,
   stores,
-  consignments,
   onSearchChange,
   onStatusChange,
   onStoreChange,
-  onConsignmentChange,
 }: SaleFiltersProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4 dark:bg-zinc-900 sm:flex-row sm:items-end">
@@ -49,7 +42,7 @@ export function SaleFilters({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
         <Input
           type="search"
-          placeholder="Tìm theo mã GD, lô ký gửi, sản phẩm..."
+          placeholder="Tìm theo mã GD, sản phẩm..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
@@ -65,19 +58,6 @@ export function SaleFilters({
             {stores.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={consignmentFilter} onValueChange={onConsignmentChange}>
-          <SelectTrigger className="w-full sm:w-44">
-            <SelectValue placeholder="Lô ký gửi" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tất cả lô</SelectItem>
-            {consignments.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.code}
               </SelectItem>
             ))}
           </SelectContent>

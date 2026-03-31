@@ -32,9 +32,9 @@ export function SaleSummaryCards({
         </div>
         <div className="min-w-0">
           <p className="text-xl font-bold text-foreground sm:text-2xl">
-            {byStatus.COMPLETED}
+            {(byStatus.COMPLETED ?? 0) + (byStatus.CONFIRMED ?? 0)}
           </p>
-          <p className="text-xs text-muted-foreground">Đã hoàn thành</p>
+          <p className="text-xs text-muted-foreground">Đã ghi nhận</p>
         </div>
       </div>
       <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 dark:bg-zinc-900">

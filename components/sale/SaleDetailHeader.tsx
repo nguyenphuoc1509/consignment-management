@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Edit2, Trash2, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SaleWithDetails, SaleStatus } from "@/types/sale";
+import { SaleWithDetails, SaleStatus, saleCountsTowardRevenue, saleDisplayCode } from "@/types/sale";
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<SaleStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -29,21 +29,21 @@ export function SaleDetailHeader({
   onDelete,
   onCancel,
 }: SaleDetailHeaderProps) {
-  const statusCfg = STATUS_CONFIG[sale.status];
+  const statusCfg = STATUS_CONFIG[sale.status] ?? { label: sale.status, variant: "secondary" as const };
   const grossAmount = sale.quantity * sale.soldPrice;
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon-sm" asChild>
-          <Link href="/dashboard/sales">
+          <Link href="/dashboard/sales/transactions">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
         <div className="flex flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-bold font-mono text-foreground sm:text-xl truncate max-w-[280px] sm:max-w-none">
-              {sale.id}
+              {saleDisplayCode(sale)}
             </h2>
             <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
           </div>
@@ -61,7 +61,7 @@ export function SaleDetailHeader({
           </Button>
         ) : (
           <>
-            {sale.status === "COMPLETED" && (
+            {saleCountsTowardRevenue(sale.status) && (
               <Button
                 variant="outline"
                 size="sm"

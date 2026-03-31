@@ -22,7 +22,7 @@ interface SaleDetailViewProps {
 }
 
 export function SaleDetailView({ sale }: SaleDetailViewProps) {
-  const statusCfg = STATUS_CONFIG[sale.status];
+  const statusCfg = STATUS_CONFIG[sale.status] ?? { label: sale.status, variant: "secondary" as const };
   const grossAmount = sale.quantity * sale.soldPrice;
   const commissionRate = 0; // Will be populated from product when available
   const storeCommission = Math.round(grossAmount * commissionRate);
@@ -135,11 +135,11 @@ export function SaleDetailView({ sale }: SaleDetailViewProps) {
       </div>
 
       {/* Notes */}
-      {sale.notes && (
+      {sale.note && (
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold text-foreground">Ghi chú</h3>
           <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <p className="text-sm text-foreground">{sale.notes}</p>
+            <p className="text-sm text-foreground">{sale.note}</p>
           </div>
         </div>
       )}

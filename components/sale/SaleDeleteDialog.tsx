@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SaleWithDetails } from "@/types/sale";
+import { SaleWithDetails, saleDisplayCode } from "@/types/sale";
 
 interface SaleDeleteDialogProps {
   target: SaleWithDetails | null;
@@ -32,7 +32,7 @@ export function SaleDeleteDialog({
             Xác nhận xóa giao dịch
           </DialogTitle>
           <DialogDescription>
-            Bạn có chắc chắn muốn xóa giao dịch &ldquo;{target?.id}&rdquo;?
+            Bạn có chắc chắn muốn xóa giao dịch &ldquo;{target ? saleDisplayCode(target) : ""}&rdquo;?
             Hành động này không thể hoàn tác.
           </DialogDescription>
         </DialogHeader>
