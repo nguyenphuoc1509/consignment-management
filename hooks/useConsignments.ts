@@ -7,6 +7,7 @@ import {
   ConsignmentItem,
   ConsignmentStatus,
   ConsignmentWithItems,
+  ConsignmentCreatePayload,
 } from "@/types/consignment";
 import { Consignor } from "@/types/consignor";
 import { Store } from "@/types/store";
@@ -41,8 +42,6 @@ export function useConsignments() {
           api.get<Product[]>("/api/products"),
         ]);
 
-        // Cast: API returns consignment + nested consignmentItems from Prisma include
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const raw = consignmentsRes as any[];
         const allItems: ConsignmentItem[] = [];
         const consignmentList: Consignment[] = [];
@@ -138,15 +137,12 @@ export function useConsignments() {
     try {
       const payload = { ...data, ...(items && { items }) };
       const updated = await api.put<Consignment>(`/api/consignments/${id}`, payload);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = updated as any;
 
-      // Cập nhật consignments state với dữ liệu mới
       setConsignments((prev) =>
         prev.map((c) => (c.id === id ? { ...updated, updatedAt: new Date().toISOString() } : c))
       );
 
-      // Cập nhật items state bằng cách merge với dữ liệu cũ (giữ nguyên id)
       if (items && items.length > 0) {
         setItems((prev) => {
           const existingForThis = prev.filter((i) => i.consignmentId === id);
@@ -187,7 +183,7 @@ export function useConsignments() {
 
   const addConsignment = useCallback(
     async (
-      data: Omit<Consignment, "id" | "createdAt" | "updatedAt">,
+      data: ConsignmentCreatePayload,
       newItems: Omit<ConsignmentItem, "id" | "consignmentId">[]
     ) => {
       try {
@@ -195,7 +191,6 @@ export function useConsignments() {
           ...data,
           items: newItems,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const raw = created as any;
         setConsignments((prev) => [raw, ...prev]);
         if (raw.consignmentItems && Array.isArray(raw.consignmentItems)) {

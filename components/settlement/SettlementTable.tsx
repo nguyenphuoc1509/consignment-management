@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Trash2, CheckCircle, Clock, Banknote } from "lucide-react";
+import { Eye, Trash2, CheckCircle, Clock, Banknote, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,6 +19,7 @@ const STATUS_CONFIG: Record<SettlementStatus, { label: string; variant: "default
   PENDING: { label: "Chờ xác nhận", variant: "secondary", icon: Clock },
   CONFIRMED: { label: "Đã xác nhận", variant: "default", icon: CheckCircle },
   PAID: { label: "Đã thanh toán", variant: "default", icon: Banknote },
+  CANCELLED: { label: "Đã hủy", variant: "secondary", icon: AlertCircle },
 };
 
 interface SettlementTableProps {
@@ -175,7 +176,9 @@ export function SettlementTable({
                       {formatCurrency(s.totalPayableAmount)}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(s.settledAt).toLocaleDateString("vi-VN")}
+                      {s.settledAt
+                        ? new Date(s.settledAt).toLocaleDateString("vi-VN")
+                        : "—"}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant={statusCfg.variant} className="gap-1">

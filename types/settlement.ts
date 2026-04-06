@@ -8,6 +8,11 @@ export type Settlement = {
   totalSoldQuantity: number;
   totalReturnedQuantity: number;
   totalDamagedQuantity: number;
+  totalSalesAmount: number;
+  totalCommissionAmount: number;
+  totalPayableAmount: number;
+  adjustmentAmount: number;
+  adjustmentReason?: string;
   dueDate?: string;
   note?: string;
   status: SettlementStatus;
@@ -25,6 +30,7 @@ export type SettlementWithDetails = Settlement & {
   storeName: string;
   saleCount: number;
   totalSoldAmount: number;
+  totalPayableAmount: number;
 };
 
 export type SettlementPreview = {

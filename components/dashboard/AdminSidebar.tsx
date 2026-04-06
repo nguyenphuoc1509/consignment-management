@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Package,
@@ -14,13 +15,14 @@ import {
   BarChart3,
   Settings,
   ChevronDown,
+  LayoutListIcon,
   X,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Tổng quan", icon: LayoutDashboard },
   { href: "/dashboard/products", label: "Sản phẩm", icon: Package },
-  { href: "/dashboard/warehouses", label: "Quản lý kho", icon: Warehouse },
+  { href: "/dashboard/warehouses", label: "Quản lý kho", icon: LayoutListIcon },
   { href: "/dashboard/consignors", label: "Kho sản xuất", icon: Warehouse },
   { href: "/dashboard/stores", label: "Cửa hàng", icon: Store },
   { href: "/dashboard/consignments", label: "Ký gửi", icon: ArrowLeftRight },
@@ -36,6 +38,7 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   // Close on Escape key
   useEffect(() => {
@@ -146,14 +149,14 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           {/* User card */}
           <div className="mt-3 flex items-center gap-3 rounded-lg px-3 py-2.5 bg-accent/50">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
-              NV
+              {session?.user?.name?.[0]?.toUpperCase() ?? "U"}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium leading-tight truncate text-foreground">
-                Nguyễn Văn Admin
+                {session?.user?.name ?? "Người dùng"}
               </p>
               <p className="text-xs text-muted-foreground leading-tight truncate">
-                admin@consignpro.vn
+                {session?.user?.email ?? ""}
               </p>
             </div>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground" />

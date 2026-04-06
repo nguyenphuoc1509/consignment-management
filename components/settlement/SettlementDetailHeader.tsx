@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Edit2, Trash2, CheckCircle, Clock, Banknote } from "lucide-react";
+import { ArrowLeft, Edit2, Trash2, CheckCircle, Clock, Banknote, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SettlementWithDetails, SettlementStatus } from "@/types/settlement";
@@ -11,6 +11,7 @@ const STATUS_CONFIG: Record<SettlementStatus, { label: string; variant: "default
   PENDING: { label: "Chờ xác nhận", variant: "secondary", icon: Clock },
   CONFIRMED: { label: "Đã xác nhận", variant: "default", icon: CheckCircle },
   PAID: { label: "Đã thanh toán", variant: "default", icon: Banknote },
+  CANCELLED: { label: "Đã hủy", variant: "secondary", icon: AlertCircle },
 };
 
 interface SettlementDetailHeaderProps {
@@ -53,7 +54,9 @@ export function SettlementDetailHeader({
           </div>
           <p className="text-xs text-muted-foreground sm:text-sm">
             {formatCurrency(settlement.totalPayableAmount)} —{" "}
-            {new Date(settlement.settledAt).toLocaleDateString("vi-VN")}
+            {settlement.settledAt
+              ? new Date(settlement.settledAt).toLocaleDateString("vi-VN")
+              : "—"}
           </p>
         </div>
       </div>

@@ -3,8 +3,6 @@ import prisma from "@/lib/prisma";
 import { InventoryService } from "./inventoryService";
 import { ConsignmentStatus } from "@prisma/client";
 
-export type ConsignmentStatusNext = typeof ConsignmentStatus;
-
 export function determineConsignmentStatus(
   currentStatus: ConsignmentStatus,
   hasPartialActivity: boolean,
@@ -55,7 +53,7 @@ export class ConsignmentService {
 
     return newStatus;
   }
-
+                                                                                                            
   static async getConsignmentWithItems(consignmentId: string) {
     return prisma.consignment.findUnique({
       where: { id: consignmentId },
@@ -97,4 +95,31 @@ export class ConsignmentService {
       c.status !== ConsignmentStatus.CANCELLED
     );
   }
+
+  static async generateConsignmentCode(sentDate: Date): Promise<string> {
+    const dateStr = formatDateForCode(sentDate);
+
+    const sequence = await prisma.consignmentSequence.upsert({
+      where: { date: dateStr },
+      create: { date: dateStr, lastSeq: 0 },
+      update: {},
+    });
+
+    const nextSeq = sequence.lastSeq + 1;
+
+    await prisma.consignmentSequence.update({
+      where: { date: dateStr },
+      data: { lastSeq: nextSeq },
+    });
+
+    return `Lô ${dateStr}-${nextSeq.toString().padStart(3, "0")}`;
+  }
+}
+
+export function formatDateForCode(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDate().toString().padStart(2, "0");
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}${month}${year}`;
 }

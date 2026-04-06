@@ -34,6 +34,8 @@ export type Consignment = {
   consignmentItems?: ConsignmentItem[];
 };
 
+export type ConsignmentCreatePayload = Omit<Consignment, "id" | "createdAt" | "updatedAt" | "code">;
+
 export type ConsignmentItem = {
   id: string;
   consignmentId: string;

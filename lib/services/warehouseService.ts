@@ -1,5 +1,6 @@
 // lib/services/warehouseService.ts
 import prisma from "@/lib/prisma";
+import { RecordStatus } from "@prisma/client";
 
 export class WarehouseService {
   static async getAll(consignorId?: string) {
@@ -68,7 +69,7 @@ export class WarehouseService {
     contactPerson: string;
     phone: string;
     note: string;
-    status: string;
+    status: RecordStatus;
   }>) {
     return prisma.warehouse.update({
       where: { id },

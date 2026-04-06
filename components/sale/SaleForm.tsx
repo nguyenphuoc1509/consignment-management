@@ -259,7 +259,7 @@ export function SaleForm({
             </Label>
             <Input
               id="soldAt"
-              type="datetime-local"
+              type="date"
               value={form.soldAt}
               onChange={(e) =>
                 setForm((f) => ({ ...f, soldAt: e.target.value }))

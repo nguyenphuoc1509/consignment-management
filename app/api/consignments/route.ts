@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { apiSuccess, apiCreated, apiError } from "@/lib/api/helpers";
+import { ConsignmentService } from "@/lib/services/consignmentService";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -41,13 +42,17 @@ export async function POST(req: NextRequest) {
     const { items, warehouseId, ...consignmentData } = body;
 
     const isShipped = consignmentData.status === "SHIPPED";
+    const sentDate = new Date(consignmentData.sentDate);
+    const code = consignmentData.code?.trim()
+      || await ConsignmentService.generateConsignmentCode(sentDate);
 
     const consignment = await prisma.$transaction(async (tx) => {
       const created = await tx.consignment.create({
         data: {
           ...consignmentData,
+          code,
           warehouseId: warehouseId || null,
-          sentDate: new Date(consignmentData.sentDate),
+          sentDate,
           ...(consignmentData.expectedReturnDate && {
             expectedReturnDate: new Date(consignmentData.expectedReturnDate),
           }),
@@ -68,7 +73,6 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Trừ tồn kho khi trạng thái là Đã gửi
       if (isShipped && warehouseId && items?.length > 0) {
         for (const item of items) {
           await tx.warehouseInventory.upsert({

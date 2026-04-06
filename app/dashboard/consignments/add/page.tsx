@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ConsignmentForm } from "@/components/consignment";
 import { useConsignments } from "@/hooks/useConsignments";
 import {
-  Consignment,
   ConsignmentItem,
   ConsignmentWithItems,
+  ConsignmentCreatePayload,
 } from "@/types/consignment";
 
 export default function AddConsignmentPage() {
@@ -17,7 +17,7 @@ export default function AddConsignmentPage() {
   const { addConsignment, consignors, stores } = useConsignments();
 
   function handleSubmit(
-    data: Omit<Consignment, "id" | "createdAt" | "updatedAt">,
+    data: ConsignmentCreatePayload,
     items: Omit<ConsignmentItem, "id" | "consignmentId">[]
   ) {
     addConsignment(data, items);

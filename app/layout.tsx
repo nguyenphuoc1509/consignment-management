@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import SessionProvider from "@/components/auth/SessionProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,8 +22,10 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className={`${geistSans.variable} h-full antialiased`}>
-        {children}
-        <Toaster />
+        <SessionProvider>
+          {children}
+          <Toaster />
+        </SessionProvider>
       </body>
     </html>
   );

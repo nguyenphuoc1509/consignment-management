@@ -29,6 +29,7 @@ import {
   ConsignmentItem,
   ConsignmentStatus,
   ConsignmentWithItems,
+  ConsignmentCreatePayload,
 } from "@/types/consignment";
 import { Consignor } from "@/types/consignor";
 import { Store } from "@/types/store";
@@ -43,7 +44,7 @@ interface ConsignmentFormProps {
   consignors: Consignor[];
   stores: Store[];
   onSubmit?: (
-    data: Omit<Consignment, "id" | "createdAt" | "updatedAt">,
+    data: ConsignmentCreatePayload,
     items: Omit<ConsignmentItem, "id" | "consignmentId">[]
   ) => void;
   onSubmitEdit?: (
@@ -54,16 +55,6 @@ interface ConsignmentFormProps {
 }
 
 type NewItem = Omit<ConsignmentItem, "id" | "consignmentId">;
-
-const STATUS_OPTIONS: { value: ConsignmentStatus; label: string }[] = [
-  { value: "DRAFT", label: "Nháp" },
-  { value: "SHIPPED", label: "Đã gửi" },
-  { value: "PARTIAL_SOLD", label: "Bán một phần" },
-  { value: "COMPLETED", label: "Hoàn thành" },
-  { value: "RETURNED", label: "Đã trả về" },
-  { value: "SETTLED", label: "Đã đối soát" },
-  { value: "CANCELLED", label: "Đã hủy" },
-];
 
 export function ConsignmentForm({
   consignment,
@@ -77,7 +68,6 @@ export function ConsignmentForm({
   const isEditing = !!consignment;
 
   const [form, setForm] = useState({
-    code: consignment?.code ?? "",
     consignorId: consignment?.consignorId ?? "",
     warehouseId: consignment?.warehouseId ?? "",
     storeId: consignment?.storeId ?? "",
@@ -145,7 +135,6 @@ export function ConsignmentForm({
 
   function validate(): boolean {
     const next: Record<string, string> = {};
-    if (!form.code.trim()) next.code = "Mã lô ký gửi là bắt buộc.";
     if (!form.consignorId) next.consignorId = "Kho sản xuất là bắt buộc.";
     if (!form.warehouseId) next.warehouseId = "Kho lấy hàng là bắt buộc.";
     if (!form.storeId) next.storeId = "Cửa hàng nhận hàng là bắt buộc.";
@@ -160,7 +149,6 @@ export function ConsignmentForm({
     if (!validate()) return;
 
     const consignmentData = {
-      code: form.code.trim(),
       consignorId: form.consignorId,
       warehouseId: form.warehouseId,
       storeId: form.storeId,
@@ -247,6 +235,15 @@ export function ConsignmentForm({
 
   function getAvailableQty(productId: string) {
     return warehouseInventory.find((i) => i.productId === productId)?.quantity ?? null;
+  }
+
+  function formatDateForPreview(dateStr: string): string {
+    if (!dateStr) return "";
+    const d = new Date(dateStr + "T00:00:00");
+    const day = d.getDate().toString().padStart(2, "0");
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}${month}${year}`;
   }
 
   return (
@@ -376,24 +373,6 @@ export function ConsignmentForm({
 
         <div className="grid gap-5 sm:grid-cols-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="code" className="text-sm font-medium">
-              Mã lô ký gửi <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="code"
-              value={form.code}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, code: e.target.value }))
-              }
-              placeholder="Ví dụ: KG-2026-006"
-              className={cn(errors.code && "border-destructive")}
-            />
-            {errors.code && (
-              <p className="text-xs text-destructive">{errors.code}</p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
             <Label htmlFor="sentDate" className="text-sm font-medium">
               Ngày gửi <span className="text-destructive">*</span>
             </Label>
@@ -424,38 +403,6 @@ export function ConsignmentForm({
               }
             />
           </div>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          {isEditing ? (
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-sm font-medium">Trạng thái</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, status: v as ConsignmentStatus }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-sm font-medium">Trạng thái</Label>
-              <div className="flex items-center h-10 px-3 rounded-md border border-border bg-muted/30 text-sm text-muted-foreground">
-                Đã gửi (mặc định khi tạo mới)
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex flex-col gap-1.5">

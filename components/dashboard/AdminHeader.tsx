@@ -2,6 +2,8 @@
 
 import { Bell, Search, ChevronDown, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import LogoutButton from "@/components/auth/LogoutButton";
+import { useSession } from "next-auth/react";
 
 export default function AdminHeader({
   title = "Tổng quan",
@@ -10,6 +12,7 @@ export default function AdminHeader({
   title?: string;
   onMenuToggle?: () => void;
 }) {
+  const { data: session } = useSession();
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-white px-4 sm:px-6 dark:bg-zinc-950">
       {/* Left side: hamburger + page title */}
@@ -46,13 +49,23 @@ export default function AdminHeader({
           <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive" />
         </button>
 
-        {/* User avatar */}
-        <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent">
-          <div className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
-            NV
+        {/* User menu */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+            <div className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              {session?.user?.name?.[0]?.toUpperCase() ?? "U"}
+            </div>
+            <div className="hidden sm:block">
+              <p className="text-xs font-medium leading-none">
+                {session?.user?.name ?? "Nguoi dung"}
+              </p>
+              <p className="text-[10px] text-muted-foreground capitalize">
+                {session?.user?.role?.toLowerCase() ?? "staff"}
+              </p>
+            </div>
           </div>
-          <ChevronDown className="size-3 text-muted-foreground hidden sm:block" />
-        </button>
+          <LogoutButton />
+        </div>
       </div>
     </header>
   );

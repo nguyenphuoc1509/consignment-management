@@ -130,6 +130,7 @@ model User {
   email     String   @unique
   name      String?
   role      UserRole @default(STAFF)
+  password  String? 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -336,6 +337,11 @@ model Settlement {
   totalSoldQuantity     Int              @default(0)
   totalReturnedQuantity Int              @default(0)
   totalDamagedQuantity  Int              @default(0)
+  totalSalesAmount      Decimal          @db.Decimal(14, 2) @default(0)
+  totalCommissionAmount Decimal          @db.Decimal(14, 2) @default(0)
+  totalPayableAmount    Decimal          @db.Decimal(14, 2) @default(0)
+  adjustmentAmount      Decimal          @db.Decimal(14, 2) @default(0)
+  adjustmentReason      String?
   dueDate               DateTime?
   note                  String?
   status                SettlementStatus @default(PENDING)
@@ -378,4 +384,14 @@ model ConsignmentReturnItem {
 
   @@unique([consignmentReturnId, productId])
   @@map("consignment_return_items")
+}
+
+model ConsignmentSequence {
+  id        String   @id @default(cuid())
+  date      String   @unique
+  lastSeq   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("consignment_sequences")
 }

@@ -15,6 +15,7 @@ const STATUS_CONFIG: Record<SettlementStatus, { label: string; variant: "default
   PENDING: { label: "Chờ xác nhận", variant: "secondary" },
   CONFIRMED: { label: "Đã xác nhận", variant: "default" },
   PAID: { label: "Đã thanh toán", variant: "default" },
+  CANCELLED: { label: "Đã hủy", variant: "secondary" },
 };
 
 interface SettlementDetailViewProps {
@@ -106,11 +107,13 @@ export function SettlementDetailView({ settlement }: SettlementDetailViewProps) 
           <div className="flex flex-col gap-1">
             <p className="text-sm text-foreground">
               Đối soát:{" "}
-              {new Date(settlement.settledAt).toLocaleDateString("vi-VN", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })}
+              {settlement.settledAt
+                ? new Date(settlement.settledAt).toLocaleDateString("vi-VN", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })
+                : "—"}
             </p>
             <p className="text-xs text-muted-foreground">
               Tạo:{" "}
@@ -125,11 +128,11 @@ export function SettlementDetailView({ settlement }: SettlementDetailViewProps) 
       </div>
 
       {/* Notes */}
-      {settlement.notes && (
+      {settlement.note && (
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold text-foreground">Ghi chú</h3>
           <div className="rounded-lg border border-border bg-muted/30 p-4">
-            <p className="text-sm text-foreground">{settlement.notes}</p>
+            <p className="text-sm text-foreground">{settlement.note}</p>
           </div>
         </div>
       )}

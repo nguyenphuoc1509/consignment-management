@@ -19,13 +19,44 @@ import { Consignment } from "@/types/consignment";
 import { Store } from "@/types/store";
 import { Consignor } from "@/types/consignor";
 
+type SettlementSubmitPayload = {
+  code?: never;
+  consignmentId: string;
+  totalSoldQuantity: number;
+  totalReturnedQuantity: number;
+  totalDamagedQuantity: number;
+  totalSalesAmount: number;
+  totalCommissionAmount: number;
+  totalPayableAmount: number;
+  adjustmentAmount: number;
+  adjustmentReason?: string;
+  dueDate?: string;
+  note?: string;
+  status: SettlementStatus;
+  approvedBy?: number;
+  approvedAt?: string;
+  paidAt?: string;
+  settledAt?: string;
+};
+
+interface SettlementFormData {
+  consignmentId: string;
+  storeId: string;
+  settledAt: string;
+  status: SettlementStatus;
+  note: string;
+  totalSalesAmount: number;
+  totalCommissionAmount: number;
+  totalPayableAmount: number;
+}
+
 interface SettlementFormProps {
   settlement?: Settlement;
   stores: Store[];
   consignors: Consignor[];
   consignments: Consignment[];
   salesByConsignment: Record<string, { count: number; totalAmount: number; commissionAmount: number; payableAmount: number }>;
-  onSubmit?: (data: Omit<Settlement, "id" | "createdAt" | "updatedAt">) => void;
+  onSubmit?: (data: SettlementSubmitPayload) => void;
   isLoading?: boolean;
 }
 
@@ -41,14 +72,14 @@ export function SettlementForm({
   const router = useRouter();
   const isEditing = !!settlement;
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<SettlementFormData>({
     consignmentId: settlement?.consignmentId ?? "",
-    storeId: settlement?.storeId ?? "",
+    storeId: "",
     settledAt: settlement?.settledAt
       ? new Date(settlement.settledAt).toISOString().slice(0, 16)
       : new Date().toISOString().slice(0, 16),
-    status: settlement?.status ?? "PENDING" as SettlementStatus,
-    notes: settlement?.notes ?? "",
+    status: settlement?.status ?? "PENDING",
+    note: settlement?.note ?? "",
     totalSalesAmount: settlement?.totalSalesAmount ?? 0,
     totalCommissionAmount: settlement?.totalCommissionAmount ?? 0,
     totalPayableAmount: settlement?.totalPayableAmount ?? 0,
@@ -80,16 +111,18 @@ export function SettlementForm({
     const consignment = consignments.find((c) => c.id === form.consignmentId);
     if (!consignment) return;
 
-    const payload: Omit<Settlement, "id" | "createdAt" | "updatedAt"> = {
+    const payload: SettlementSubmitPayload = {
       consignmentId: form.consignmentId,
-      consignorId: consignment.consignorId,
-      storeId: form.storeId,
+      totalSoldQuantity: 0,
+      totalReturnedQuantity: 0,
+      totalDamagedQuantity: 0,
       totalSalesAmount: form.totalSalesAmount,
       totalCommissionAmount: form.totalCommissionAmount,
       totalPayableAmount: form.totalPayableAmount,
+      adjustmentAmount: 0,
       settledAt: new Date(form.settledAt).toISOString(),
       status: form.status,
-      notes: form.notes.trim() || undefined,
+      note: form.note.trim() || undefined,
     };
 
     if (onSubmit) {
@@ -138,13 +171,13 @@ export function SettlementForm({
                 <SelectValue placeholder="Chọn lô ký gửi..." />
               </SelectTrigger>
               <SelectContent>
-                {consignments.filter((c) => c.status !== "SETTLED" && c.status !== "PENDING").length === 0 ? (
+                {consignments.filter((c) => c.status !== "SETTLED" && c.status !== "CANCELLED").length === 0 ? (
                   <div className="px-3 py-2 text-sm text-muted-foreground">
                     Không có lô ký gửi nào có giao dịch.
                   </div>
                 ) : (
                   consignments
-                    .filter((c) => c.status !== "SETTLED" && c.status !== "PENDING")
+                    .filter((c) => c.status !== "SETTLED" && c.status !== "CANCELLED")
                     .map((c) => {
                       const consignor = consignors.find((cg) => cg.id === c.consignorId);
                       const store = stores.find((s) => s.id === c.storeId);
@@ -330,12 +363,12 @@ export function SettlementForm({
           Bổ sung
         </h3>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="notes" className="text-sm font-medium">Ghi chú</Label>
+          <Label className="text-sm font-medium">Ghi chú</Label>
           <Textarea
-            id="notes"
-            value={form.notes}
+            id="note"
+            value={form.note}
             onChange={(e) =>
-              setForm((f) => ({ ...f, notes: e.target.value }))
+              setForm((f) => ({ ...f, note: e.target.value }))
             }
             placeholder="Nhập ghi chú nếu có..."
             rows={2}

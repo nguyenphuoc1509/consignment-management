@@ -53,7 +53,6 @@ export async function PUT(
     if (data.sentDate) data.sentDate = new Date(data.sentDate);
     if (data.expectedReturnDate) data.expectedReturnDate = new Date(data.expectedReturnDate);
 
-    // Lấy consignment hiện tại để so sánh quantitySent
     const existing = await prisma.consignment.findUnique({
       where: { id },
       include: { consignmentItems: true },
@@ -62,7 +61,6 @@ export async function PUT(
     if (!existing) return apiNotFound("Không tìm thấy ký gửi");
 
     const consignment = await prisma.$transaction(async (tx) => {
-      // Cập nhật warehouseInventory khi quantitySent thay đổi (TRƯỚC khi cập nhật consignment)
       if (items?.length > 0 && existing.warehouseId) {
         for (const item of items) {
           const existingItem = existing.consignmentItems.find(
@@ -99,7 +97,6 @@ export async function PUT(
         }
       }
 
-      // Cập nhật thông tin chính
       const updated = await tx.consignment.update({
         where: { id },
         data,
@@ -134,7 +131,6 @@ export async function DELETE(
 
     if (!consignment) return apiNotFound("Không tìm thấy ký gửi để xóa");
 
-    // Chỉ cho phép xóa lô ở trạng thái DRAFT
     if (consignment.status !== "DRAFT") {
       return apiError(
         `Không thể xóa lô ký gửi đã gửi. Chỉ có thể xóa lô ở trạng thái Nháp.`

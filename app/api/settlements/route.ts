@@ -1,7 +1,8 @@
 // app/api/settlements/route.ts
 import { NextRequest } from "next/server";
 import { SettlementService } from "@/lib/services/settlementService";
-import { apiSuccess, apiError, apiNotFound } from "@/lib/api/helpers";
+import { apiSuccess, apiError } from "@/lib/api/helpers";
+import prisma from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -10,8 +11,6 @@ export async function GET(req: NextRequest) {
   const storeFilter = searchParams.get("storeFilter") ?? "";
   const consignorFilter = searchParams.get("consignorFilter") ?? "";
   const consignmentFilter = searchParams.get("consignmentFilter") ?? "";
-
-  const { prisma } = await import("@/lib/prisma");
 
   const settlements = await prisma.settlement.findMany({
     where: {
@@ -34,9 +33,9 @@ export async function GET(req: NextRequest) {
           code: true,
           consignor: { select: { name: true } },
           store: { select: { name: true } },
+          sales: { select: { id: true } },
         },
       },
-      _count: { select: { consignment: { select: { sales: true } } } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -46,7 +45,9 @@ export async function GET(req: NextRequest) {
     consignmentCode: s.consignment.code,
     consignorName: s.consignment.consignor.name,
     storeName: s.consignment.store.name,
-    saleCount: s._count.consignment.sales,
+    saleCount: s.consignment.sales.length,
+    totalSalesAmount: s.totalSalesAmount,
+    totalPayableAmount: s.totalPayableAmount,
   }));
 
   return apiSuccess(enriched);

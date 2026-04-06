@@ -8,6 +8,8 @@ import { SaleWithDetails, SaleStatus, saleCountsTowardRevenue, saleDisplayCode }
 import { formatCurrency } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<SaleStatus, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+  DRAFT: { label: "Nháp", variant: "secondary" },
+  CONFIRMED: { label: "Đã xác nhận", variant: "default" },
   COMPLETED: { label: "Hoàn thành", variant: "default" },
   CANCELLED: { label: "Đã hủy", variant: "secondary" },
 };
